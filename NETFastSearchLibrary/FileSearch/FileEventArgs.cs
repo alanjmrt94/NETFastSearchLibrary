@@ -20,7 +20,7 @@ namespace NETFastSearchLibrary
         /// <param name="files">Lista de archivos encontrados.</param>
         public FileEventArgs(List<FileInfo> files)
         {
-            Files = files;
+            Files = files == null ? new List<FileInfo>() : new List<FileInfo>(files);
         }
     }
 }

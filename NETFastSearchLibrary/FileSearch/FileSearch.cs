@@ -273,39 +273,39 @@ namespace NETFastSearchLibrary
         private void CheckFolder(string folder)
         {
             if (folder == null)
-                throw new ArgumentNullException(nameof(folder), "Argument is null.");
-              
+                throw new ArgumentNullException("folder", "El argumento no puede ser nulo.");
+
             if (string.IsNullOrEmpty(folder))
-                throw new ArgumentException("Argument is not valid.", nameof(folder));
+                throw new ArgumentException("El argumento no es válido.", "folder");
 
             DirectoryInfo dir = new DirectoryInfo(folder);
 
             if (!dir.Exists)
-                throw new ArgumentException("Argument does not represent an existing directory.", nameof(folder));
+                throw new ArgumentException("El argumento no representa un directorio existente.", "folder");
         }
 
 
         private void CheckPattern(string pattern)
         {
             if (pattern == null)
-                throw new ArgumentNullException(nameof(pattern), "Argument is null.");
+                throw new ArgumentNullException("pattern", "El argumento no puede ser nulo.");
 
             if (string.IsNullOrEmpty(pattern))
-                throw new ArgumentException("Argument is not valid.", nameof(pattern));
+                throw new ArgumentException("El argumento no es válido.", "pattern");
         }
 
 
         private void CheckDelegate(Func<FileInfo, bool> isValid)
         {
             if (isValid == null)
-                throw new ArgumentNullException(nameof(isValid), "Argument is null.");
+                throw new ArgumentNullException("isValid", "El argumento no puede ser nulo.");
         }
 
 
         private void CheckTokenSource(CancellationTokenSource tokenSource)
         {
             if (tokenSource == null)
-                throw new ArgumentNullException(nameof(tokenSource), "Argument is null.");
+                throw new ArgumentNullException("tokenSource", "El argumento no puede ser nulo.");
         }
  
 
@@ -350,7 +350,7 @@ namespace NETFastSearchLibrary
         public void StopSearch()
         {
             if (tokenSource == null)
-                throw new InvalidOperationException("Impossible to stop operation without instance of CancellationTokenSource.");
+                throw new InvalidOperationException("No es posible detener la búsqueda sin un CancellationTokenSource.");
 
             tokenSource.Cancel();
         }
@@ -373,46 +373,40 @@ namespace NETFastSearchLibrary
         /// <exception cref="ArgumentNullException"></exception>
         static public List<FileInfo> GetFiles(string folder, string pattern = "*")
         {
-            DirectoryInfo dirInfo = null;
-            DirectoryInfo[] directories = null;
-            try
-            {
-                dirInfo = new DirectoryInfo(folder);
-                directories = dirInfo.GetDirectories();
+            ConcurrentDictionary<string, byte> visited = new ConcurrentDictionary<string, byte>();
+            return GetFiles(folder, pattern, visited);
+        }
 
-                if (directories.Length == 0)
-                    return new List<FileInfo>(dirInfo.GetFiles(pattern));
-            }
-            catch (UnauthorizedAccessException ex)
+        static private List<FileInfo> GetFiles(string folder, string pattern, ConcurrentDictionary<string, byte> visited)
+        {
+            if (!visited.TryAdd(PathHelper.GetCanonicalKey(folder), 0))
             {
                 return new List<FileInfo>();
             }
-            catch (DirectoryNotFoundException ex)
+
+            DirectoryInfo dirInfo;
+            DirectoryInfo[] directories;
+
+            if (!SearchIoHelper.TryGetDirectories(folder, out dirInfo, out directories))
             {
                 return new List<FileInfo>();
+            }
+
+            if (directories.Length == 0)
+            {
+                return SearchIoHelper.RunIgnoringIo(
+                    () => new List<FileInfo>(dirInfo.GetFiles(pattern)),
+                    new List<FileInfo>());
             }
 
             List<FileInfo> result = new List<FileInfo>();
 
-            foreach (var d in directories)
+            foreach (DirectoryInfo d in directories)
             {
-                result.AddRange(GetFiles(d.FullName, pattern));
+                result.AddRange(GetFiles(d.FullName, pattern, visited));
             }
 
-            try
-            {
-                result.AddRange(dirInfo.GetFiles(pattern));
-            }
-            catch (UnauthorizedAccessException ex)
-            {
-            }
-            catch (PathTooLongException ex)
-            {
-            }
-            catch (DirectoryNotFoundException ex)
-            {
-            }
-
+            SearchIoHelper.RunIgnoringIo(() => result.AddRange(dirInfo.GetFiles(pattern)));
             return result;
         }
 
@@ -428,63 +422,58 @@ namespace NETFastSearchLibrary
         /// <exception cref="ArgumentNullException"></exception>
         static public List<FileInfo> GetFiles(string folder, Func<FileInfo, bool> isValid)
         {
-            DirectoryInfo dirInfo = null;
-            DirectoryInfo[] directories = null;
+            ConcurrentDictionary<string, byte> visited = new ConcurrentDictionary<string, byte>();
+            return GetFiles(folder, isValid, visited);
+        }
+
+        static private List<FileInfo> GetFiles(string folder, Func<FileInfo, bool> isValid, ConcurrentDictionary<string, byte> visited)
+        {
+            if (!visited.TryAdd(PathHelper.GetCanonicalKey(folder), 0))
+            {
+                return new List<FileInfo>();
+            }
+
+            DirectoryInfo dirInfo;
+            DirectoryInfo[] directories;
+
+            if (!SearchIoHelper.TryGetDirectories(folder, out dirInfo, out directories))
+            {
+                return new List<FileInfo>();
+            }
+
+            if (directories.Length == 0)
+            {
+                return CollectFiles(dirInfo, isValid);
+            }
+
             List<FileInfo> resultFiles = new List<FileInfo>();
 
-            try
+            foreach (DirectoryInfo d in directories)
             {
-                dirInfo = new DirectoryInfo(folder);
-                directories = dirInfo.GetDirectories();
-
-                if (directories.Length == 0)
-                {
-                    FileInfo[] files = dirInfo.GetFiles();
-
-                    foreach (var file in files)
-                        if (isValid(file))
-                            resultFiles.Add(file);
-
-                    return resultFiles;
-                }
-            }
-            catch (UnauthorizedAccessException ex)
-            {
-                return new List<FileInfo>();
-            }
-            catch (PathTooLongException ex)
-            {
-                return new List<FileInfo>();
-            }
-            catch (DirectoryNotFoundException ex)
-            {
-                return new List<FileInfo>();
+                resultFiles.AddRange(GetFiles(d.FullName, isValid, visited));
             }
 
-            foreach (var d in directories)
-            {
-                resultFiles.AddRange(GetFiles(d.FullName, isValid));
-            }
+            resultFiles.AddRange(CollectFiles(dirInfo, isValid));
+            return resultFiles;
+        }
 
-            try
+        static private List<FileInfo> CollectFiles(DirectoryInfo dirInfo, Func<FileInfo, bool> isValid)
+        {
+            return SearchIoHelper.RunIgnoringIo(() =>
             {
+                List<FileInfo> resultFiles = new List<FileInfo>();
                 FileInfo[] files = dirInfo.GetFiles();
 
-                foreach (var file in files)
+                foreach (FileInfo file in files)
+                {
                     if (isValid(file))
+                    {
                         resultFiles.Add(file);
-            }
-            catch (UnauthorizedAccessException ex)
-            {
-            }
-            catch (PathTooLongException ex)
-            {
-            }
-            catch (DirectoryNotFoundException ex)
-            {
-            }
+                    }
+                }
 
-            return resultFiles;
+                return resultFiles;
+            }, new List<FileInfo>());
         }
 
 
@@ -536,15 +525,22 @@ namespace NETFastSearchLibrary
         static public List<FileInfo> GetFilesFast(string folder, string pattern = "*")
         {
             ConcurrentBag<FileInfo> files = new ConcurrentBag<FileInfo>();
+            ConcurrentDictionary<string, byte> visited = new ConcurrentDictionary<string, byte>();
 
-            List<DirectoryInfo> startDirs = GetStartDirectories(folder, files, pattern);
+            List<DirectoryInfo> startDirs = GetStartDirectories(folder, files, pattern, visited);
+            int parallelism = ParallelSearchHelper.MaxDegreeOfParallelism;
 
-            startDirs.AsParallel().ForAll((d) =>
+            startDirs.AsParallel().WithDegreeOfParallelism(parallelism).ForAll((d) =>
             {
-                GetStartDirectories(d.FullName, files, pattern).AsParallel().ForAll((dir) =>
-                {
-                    GetFiles(dir.FullName, pattern).ForEach((f) => files.Add(f));
-                });
+                GetStartDirectories(d.FullName, files, pattern, visited).AsParallel()
+                    .WithDegreeOfParallelism(parallelism)
+                    .ForAll((dir) =>
+                    {
+                        foreach (FileInfo f in GetFiles(dir.FullName, pattern, visited))
+                        {
+                            files.Add(f);
+                        }
+                    });
             });
 
             return files.ToList();
@@ -563,15 +559,22 @@ namespace NETFastSearchLibrary
         static public List<FileInfo> GetFilesFast(string folder, Func<FileInfo, bool> isValid)
         {
             ConcurrentBag<FileInfo> files = new ConcurrentBag<FileInfo>();
+            ConcurrentDictionary<string, byte> visited = new ConcurrentDictionary<string, byte>();
 
-            List<DirectoryInfo> startDirs = GetStartDirectories(folder, files, isValid);
+            List<DirectoryInfo> startDirs = GetStartDirectories(folder, files, isValid, visited);
+            int parallelism = ParallelSearchHelper.MaxDegreeOfParallelism;
 
-            startDirs.AsParallel().ForAll((d) =>
+            startDirs.AsParallel().WithDegreeOfParallelism(parallelism).ForAll((d) =>
             {
-                GetStartDirectories(d.FullName, files, isValid).AsParallel().ForAll((dir) =>
-                {
-                    GetFiles(dir.FullName, isValid).ForEach((f) => files.Add(f));
-                });
+                GetStartDirectories(d.FullName, files, isValid, visited).AsParallel()
+                    .WithDegreeOfParallelism(parallelism)
+                    .ForAll((dir) =>
+                    {
+                        foreach (FileInfo f in GetFiles(dir.FullName, isValid, visited))
+                        {
+                            files.Add(f);
+                        }
+                    });
             });
 
             return files.ToList();
@@ -618,81 +621,89 @@ namespace NETFastSearchLibrary
 
         #region Private members
 
-        static private List<DirectoryInfo> GetStartDirectories(string folder, ConcurrentBag<FileInfo> files, string pattern)
+        static private List<DirectoryInfo> GetStartDirectories(
+            string folder,
+            ConcurrentBag<FileInfo> files,
+            string pattern,
+            ConcurrentDictionary<string, byte> visited)
         {
-            DirectoryInfo dirInfo = null;
-            DirectoryInfo[] directories = null;
-            try
+            if (!visited.TryAdd(PathHelper.GetCanonicalKey(folder), 0))
             {
-                dirInfo = new DirectoryInfo(folder);
-                directories = dirInfo.GetDirectories();
+                return new List<DirectoryInfo>();
+            }
 
-                foreach (var f in dirInfo.GetFiles(pattern))
+            DirectoryInfo dirInfo;
+            DirectoryInfo[] directories;
+
+            if (!SearchIoHelper.TryGetDirectories(folder, out dirInfo, out directories))
+            {
+                return new List<DirectoryInfo>();
+            }
+
+            SearchIoHelper.RunIgnoringIo(() =>
+            {
+                foreach (FileInfo f in dirInfo.GetFiles(pattern))
                 {
                     files.Add(f);
                 }
+            });
 
-                if (directories.Length > 1)
-                    return new List<DirectoryInfo>(directories);
-
-                if (directories.Length == 0)
-                    return new List<DirectoryInfo>();
-
-            }
-            catch (UnauthorizedAccessException ex)
+            if (directories.Length > 1)
             {
-                return new List<DirectoryInfo>();
+                return new List<DirectoryInfo>(directories);
             }
-            catch (PathTooLongException ex)
-            {
-                return new List<DirectoryInfo>();
-            }
-            catch (DirectoryNotFoundException ex)
+
+            if (directories.Length == 0)
             {
                 return new List<DirectoryInfo>();
             }
 
-            return GetStartDirectories(directories[0].FullName, files, pattern);
+            return GetStartDirectories(directories[0].FullName, files, pattern, visited);
         }
 
 
 
-        static private List<DirectoryInfo> GetStartDirectories(string folder, ConcurrentBag<FileInfo> resultFiles, Func<FileInfo, bool> isValid)
+        static private List<DirectoryInfo> GetStartDirectories(
+            string folder,
+            ConcurrentBag<FileInfo> resultFiles,
+            Func<FileInfo, bool> isValid,
+            ConcurrentDictionary<string, byte> visited)
         {
-            DirectoryInfo dirInfo = null;
-            DirectoryInfo[] directories = null;
-
-            try
+            if (!visited.TryAdd(PathHelper.GetCanonicalKey(folder), 0))
             {
-                dirInfo = new DirectoryInfo(folder);
-                directories = dirInfo.GetDirectories();
+                return new List<DirectoryInfo>();
+            }
 
-                FileInfo[] files = dirInfo.GetFiles();
+            DirectoryInfo dirInfo;
+            DirectoryInfo[] directories;
 
-                foreach (var file in files)
+            if (!SearchIoHelper.TryGetDirectories(folder, out dirInfo, out directories))
+            {
+                return new List<DirectoryInfo>();
+            }
+
+            SearchIoHelper.RunIgnoringIo(() =>
+            {
+                foreach (FileInfo file in dirInfo.GetFiles())
+                {
                     if (isValid(file))
+                    {
                         resultFiles.Add(file);
+                    }
+                }
+            });
 
-                if (directories.Length > 1)
-                    return new List<DirectoryInfo>(directories);
+            if (directories.Length > 1)
+            {
+                return new List<DirectoryInfo>(directories);
+            }
 
-                if (directories.Length == 0)
-                    return new List<DirectoryInfo>();
-            }
-            catch (UnauthorizedAccessException ex)
-            {
-                return new List<DirectoryInfo>();
-            }
-            catch (PathTooLongException ex)
-            {
-                return new List<DirectoryInfo>();
-            }
-            catch (DirectoryNotFoundException ex)
+            if (directories.Length == 0)
             {
                 return new List<DirectoryInfo>();
             }
 
-            return GetStartDirectories(directories[0].FullName, resultFiles, isValid);
+            return GetStartDirectories(directories[0].FullName, resultFiles, isValid, visited);
         }
 
         #endregion

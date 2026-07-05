@@ -209,51 +209,53 @@ namespace NETFastSearchLibrary
         private void CheckFolders(List<string> folders)
         {
             if (folders == null)
-                throw new ArgumentNullException(nameof(folders), "Argument is null.");
+                throw new ArgumentNullException("folders", "El argumento no puede ser nulo.");
 
             if (folders.Count == 0)
-                throw new ArgumentException("Argument is an empty list.", nameof(folders));
+                throw new ArgumentException("La lista de carpetas está vacía.", "folders");
 
-            foreach (var folder in folders)
+            foreach (string folder in folders)
+            {
                 CheckFolder(folder);
+            }
         }
 
         private static void CheckFolder(string folder)
         {
             if (folder == null)
-                throw new ArgumentNullException(nameof(folder), "Argument is null.");
+                throw new ArgumentNullException("folder", "El argumento no puede ser nulo.");
 
             if (string.IsNullOrEmpty(folder))
-                throw new ArgumentException("Argument is not valid.", nameof(folder));
+                throw new ArgumentException("El argumento no es válido.", "folder");
 
             DirectoryInfo dir = new DirectoryInfo(folder);
 
             if (!dir.Exists)
-                throw new ArgumentException("Argument does not represent an existing directory.", nameof(folder));
+                throw new ArgumentException("El argumento no representa un directorio existente.", "folder");
         }
 
 
         private void CheckPattern(string pattern)
         {
             if (pattern == null)
-                throw new ArgumentNullException(nameof(pattern), "Argument is null.");
+                throw new ArgumentNullException("pattern", "El argumento no puede ser nulo.");
 
             if (string.IsNullOrEmpty(pattern))
-                throw new ArgumentException("Argument is not valid.", nameof(pattern));
+                throw new ArgumentException("El argumento no es válido.", "pattern");
         }
 
 
         private void CheckDelegate(Func<FileInfo, bool> isValid)
         {
             if (isValid == null)
-                throw new ArgumentNullException(nameof(isValid), "Argument is null.");
+                throw new ArgumentNullException("isValid", "El argumento no puede ser nulo.");
         }
 
 
         private void CheckTokenSource(CancellationTokenSource tokenSource)
         {
             if (tokenSource == null)
-                throw new ArgumentNullException(nameof(tokenSource), "Argument is null.");
+                throw new ArgumentNullException("tokenSource", "El argumento no puede ser nulo.");
         }
 
 
@@ -267,16 +269,21 @@ namespace NETFastSearchLibrary
         {
             try
             {
-                searchers.ForEach(s =>
-                {
-                    s.StartSearch();
-                });
+                Parallel.ForEach(
+                    searchers,
+                    new ParallelOptions
+                    {
+                        MaxDegreeOfParallelism = ParallelSearchHelper.MaxDegreeOfParallelism
+                    },
+                    s => s.StartSearch());
             }
-            catch(OperationCanceledException ex)
+            catch (OperationCanceledException)
             {
                 OnSearchCompleted(true);
                 if (!suppressOperationCanceledException)
+                {
                     throw;
+                }
                 return;
             }
 

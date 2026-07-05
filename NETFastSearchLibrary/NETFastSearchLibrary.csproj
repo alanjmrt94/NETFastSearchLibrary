@@ -33,7 +33,7 @@
 		<DefineConstants/>
 		<ErrorReport>prompt</ErrorReport>
 		<WarningLevel>4</WarningLevel>
-		<NoWarn>CS0168;CA1303</NoWarn>
+		<NoWarn>CA1303</NoWarn>
 		<PlatformTarget>AnyCPU</PlatformTarget>
 		<GenerateSerializationAssemblies>Off</GenerateSerializationAssemblies>
 		<RunCodeAnalysis>false</RunCodeAnalysis>
@@ -43,12 +43,6 @@
 	<PropertyGroup/>
 	<PropertyGroup>
 		<ApplicationIcon>fsl.ico</ApplicationIcon>
-	</PropertyGroup>
-	<PropertyGroup>
-		<SignAssembly>true</SignAssembly>
-	</PropertyGroup>
-	<PropertyGroup>
-		<AssemblyOriginatorKeyFile>PaatyDSMApps96.pfx</AssemblyOriginatorKeyFile>
 	</PropertyGroup>
 	<PropertyGroup>
 		<ApplicationManifest>app.manifest</ApplicationManifest>
@@ -83,6 +77,9 @@
 	</ItemGroup>
 	<ItemGroup>
 		<Compile Include="ExecuteHandlers.cs"/>
+		<Compile Include="FileSearch\Helpers\ParallelSearchHelper.cs"/>
+		<Compile Include="FileSearch\Helpers\PathHelper.cs"/>
+		<Compile Include="FileSearch\Helpers\SearchIoHelper.cs"/>
 		<Compile Include="FileSearch\FileCancellationDelegateSearch.cs"/>
 		<Compile Include="FileSearch\FileCancellationPatternSearch.cs"/>
 		<Compile Include="FileSearch\FileCancellationSearchBase.cs"/>
@@ -98,7 +95,6 @@
 	<ItemGroup>
 		<None Include="app.config"/>
 		<None Include="app.manifest"/>
-		<None Include="PaatyDSMApps96.pfx"/>
 		<None Include="packages.config"/>
 	</ItemGroup>
 	<ItemGroup>
@@ -112,14 +108,4 @@
 		</PropertyGroup>
 		<Error Condition="!Exists('..\packages\Microsoft.Bcl.Build.1.0.21\build\Microsoft.Bcl.Build.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\Microsoft.Bcl.Build.1.0.21\build\Microsoft.Bcl.Build.targets'))"/>
 	</Target>
-	<!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
-       Other similar extension points exist, see Microsoft.Common.targets.
-  <Target Name="BeforeBuild">
-  </Target>
-  <Target Name="AfterBuild">
-  </Target>
-  -->
-	<ItemGroup>
-		<PackageReference Include="Microsoft.Bcl.Build" Version="1.0.21"/>
-	</ItemGroup>
 </Project>

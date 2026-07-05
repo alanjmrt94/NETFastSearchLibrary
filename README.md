@@ -5,7 +5,7 @@
 <td width="220" valign="top"><img src="logo_base.png" alt="NETFastSearchLibrary" width="200"/></td>
 <td valign="top">
 
-**Versión:** `1.0.3` · **Estado:** mantenimiento mínimo (solo .NET Framework 4.0)  
+**Versión:** `1.0.4` · **Estado:** mantenimiento mínimo (solo .NET Framework 4.0)  
 **Autor:** [alanjmrt94](https://github.com/alanjmrt94) · **Organización:** EMZ Apps  
 **Repositorio sucesor:** [**NetcoreFSL**](https://github.com/alanjmrt94/netcore-fsl) — biblioteca multiplataforma para .NET 8
 
@@ -32,7 +32,23 @@ Biblioteca multiproceso escrita en C# que permite encontrar archivos de forma re
 
 - [.NET Framework 4.0](https://dotnet.microsoft.com/download/dotnet-framework/net40) o superior
 - Windows XP o posterior
-- Visual Studio 2010+ (recomendado VS 2019/2022 para editar la solución)
+- Visual Studio 2015+ (requerido por `nameof` en validaciones; recomendado VS 2019/2022)
+
+## Compilar desde el código fuente (Windows)
+
+Requiere **Windows**, **Visual Studio** (o Build Tools) con soporte para **.NET Framework 4.0** y **NuGet**.
+
+```text
+# 1. Restaurar paquetes (desde la raíz del repositorio)
+nuget restore NETFastSearchLibrary.sln
+
+# 2. Compilar Release
+msbuild NETFastSearchLibrary.sln /p:Configuration=Release /p:Platform="Any CPU"
+```
+
+Salida: `NETFastSearchLibrary\bin\Release\NETFastSearchLibrary.dll` (+ `.XML` de documentación).
+
+> **Nota:** El ensamblado **no se firma** (`SignAssembly` deshabilitado). El certificado legacy `PaatyDSMApps96.pfx` no forma parte del repositorio.
 
 ## Instalación
 
@@ -211,6 +227,7 @@ FileSearch searcher = new FileSearch(
 | Rutas largas | En Windows, habilite `LongPathsEnabled` en el registro (`HKLM\...\FileSystem`) |
 | `InNewTask` | Las excepciones no se propagan al hilo llamador; use `SearchCompleted` |
 | Sin pausa | No hay `PauseSearch`/`ResumeSearch` (disponible en [NetcoreFSL](https://github.com/alanjmrt94/netcore-fsl)) |
+| Junctions / symlinks | Se detectan ciclos por ruta canónica visitada; enlaces pueden listar el mismo destino una vez |
 
 ## Migración a NetcoreFSL
 
@@ -241,8 +258,8 @@ NETFastSearchLibrary/
 
 La versión se define en `NETFastSearchLibrary/Properties/AssemblyInfo.cs`:
 
-- `AssemblyVersion`: `1.0.3.0`
-- `AssemblyInformationalVersion`: `1.0.3 (.NET Framework 4.0, Legacy)`
+- `AssemblyVersion`: `1.0.4.0`
+- `AssemblyInformationalVersion`: `1.0.4 (.NET Framework 4.0, Legacy)`
 
 ## Licencia
 
