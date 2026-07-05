@@ -7,8 +7,9 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NETFastSearchLibrary", "NET
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "GitHub", "GitHub", "{775D7D65-3E46-48B2-AB1D-91FB833DF684}"
 	ProjectSection(SolutionItems) = preProject
+		CHANGELOG.md = CHANGELOG.md
 		LICENSE = LICENSE
-		Logo.png = Logo.png
+		logo_base.png = logo_base.png
 		README.md = README.md
 	EndProjectSection
 EndProject
