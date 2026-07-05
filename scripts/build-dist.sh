@@ -261,13 +261,22 @@ push_nuget() {
     -ApiKey "$NUGET_API_KEY" -SkipDuplicate
 }
 
+tag_exists_remote() {
+  local tag="$1"
+  git -C "$ROOT" ls-remote --tags origin "refs/tags/${tag}" 2>/dev/null | grep -q .
+}
+
 create_git_tag() {
   local version="$1"
   local tag="v$version"
   git -C "$ROOT" rev-parse --git-dir >/dev/null 2>&1 || { echo "No es un repositorio git." >&2; return 1; }
   if git -C "$ROOT" rev-parse "$tag" >/dev/null 2>&1; then
-    echo "El tag $tag ya existe." >&2
-    return 1
+    echo "    Tag local $tag ya existe." >&2
+    return 0
+  fi
+  if tag_exists_remote "$tag"; then
+    echo "    Tag remoto $tag ya existe en origin." >&2
+    return 0
   fi
   echo "==> Creando tag $tag"
   git -C "$ROOT" tag -a "$tag" -m "Release $tag"
@@ -276,9 +285,19 @@ create_git_tag() {
 push_git_tag() {
   local version="$1"
   local tag="v$version"
+  if tag_exists_remote "$tag"; then
+    echo "    Tag $tag ya está en origin; omitiendo push." >&2
+    echo "    Release: https://github.com/${GITHUB_REPO}/releases/tag/${tag}"
+    return 0
+  fi
+  git -C "$ROOT" rev-parse "$tag" >/dev/null 2>&1 || create_git_tag "$version" || return 1
   echo "==> Empujando tag $tag a origin"
-  git -C "$ROOT" push origin "$tag"
-  echo "    Si release.yml está activo, CI publicará en NuGet y creará GitHub Release."
+  if git -C "$ROOT" push origin "$tag"; then
+    echo "    Si release.yml está activo, CI publicará en NuGet y creará GitHub Release."
+  else
+    echo "    Push del tag falló (puede existir ya en remoto)." >&2
+    return 1
+  fi
 }
 
 github_release() {
@@ -286,6 +305,19 @@ github_release() {
   local tag="v$version"
   local dist="$ROOT/dist/$version"
   command -v gh >/dev/null || { echo "gh CLI no encontrado (https://cli.github.com)." >&2; return 1; }
+
+  if gh release view "$tag" --repo "$GITHUB_REPO" >/dev/null 2>&1; then
+    echo "    GitHub Release $tag ya existe." >&2
+    echo "    https://github.com/${GITHUB_REPO}/releases/tag/${tag}"
+    local nupkg asset
+    nupkg="$(find "$dist" -maxdepth 1 -name '*.nupkg' -print -quit 2>/dev/null || true)"
+    for asset in "$nupkg" "$dist/NETFastSearchLibrary.dll" "$dist/NETFastSearchLibrary.XML"; do
+      [[ -f "$asset" ]] || continue
+      gh release upload "$tag" "$asset" --repo "$GITHUB_REPO" --clobber 2>/dev/null || true
+    done
+    return 0
+  fi
+
   git -C "$ROOT" rev-parse "$tag" >/dev/null 2>&1 || create_git_tag "$version" || return 1
   echo "==> Creando GitHub Release $tag"
   local assets=()

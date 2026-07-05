@@ -10,12 +10,14 @@ declare -A NUGET_PACKAGES=(
   ["Microsoft.Bcl.1.1.10"]="https://www.nuget.org/api/v2/package/Microsoft.Bcl/1.1.10"
   ["Microsoft.Bcl.Async.1.0.168"]="https://www.nuget.org/api/v2/package/Microsoft.Bcl.Async/1.0.168"
   ["Microsoft.Bcl.Build.1.0.21"]="https://www.nuget.org/api/v2/package/Microsoft.Bcl.Build/1.0.21"
+  ["Microsoft.NETFramework.ReferenceAssemblies.net40.1.0.3"]="https://www.nuget.org/api/v2/package/Microsoft.NETFramework.ReferenceAssemblies.net40/1.0.3"
 )
 
 REQUIRED_MARKERS=(
   "Microsoft.Bcl.Build.1.0.21/build/Microsoft.Bcl.Build.targets"
   "Microsoft.Bcl.1.1.10/lib/net40/System.IO.dll"
   "Microsoft.Bcl.Async.1.0.168/lib/net40/Microsoft.Threading.Tasks.dll"
+  "Microsoft.NETFramework.ReferenceAssemblies.net40.1.0.3/build/Microsoft.NETFramework.ReferenceAssemblies.net40.targets"
 )
 
 packages_ok() {
