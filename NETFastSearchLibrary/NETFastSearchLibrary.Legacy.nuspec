@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2013/05/nuspec.xsd">
+	<metadata>
+		<id>NETFastSearchLibrary.Legacy</id>
+		<version>$version$</version>
+		<title>NETFastSearchLibrary (Legacy)</title>
+		<authors>alanjmrt94</authors>
+		<owners>EMZ Apps</owners>
+		<requireLicenseAcceptance>false</requireLicenseAcceptance>
+		<license type="expression">MIT</license>
+		<projectUrl>https://github.com/alanjmrt94/NETFastSearchLibrary</projectUrl>
+		<repository type="git" url="https://github.com/alanjmrt94/NETFastSearchLibrary" commit="$commit$"/>
+		<icon>logo_base.png</icon>
+		<readme>README.md</readme>
+		<description>Biblioteca multiproceso de .NET Framework 4.0 para búsqueda rápida de archivos. Versión legacy; para proyectos modernos use NetcoreFSL (https://github.com/alanjmrt94/netcore-fsl).</description>
+		<summary>Búsqueda recursiva rápida de archivos para .NET Framework 4.0 (Windows XP+).</summary>
+		<copyright>Copyright © 2021-2026 alanjmrt94 (EMZ Apps)</copyright>
+		<tags>filesystem search legacy net40 windows fsl fast-search</tags>
+		<dependencies>
+			<group targetFramework="net40">
+				<dependency id="Microsoft.Bcl" version="1.1.10"/>
+				<dependency id="Microsoft.Bcl.Async" version="1.0.168"/>
+			</group>
+		</dependencies>
+	</metadata>
+	<files>
+		<file src="..\logo_base.png" target=""/>
+		<file src="..\README.md" target=""/>
+		<file src="..\LICENSE" target=""/>
+		<file src="bin\Release\NETFastSearchLibrary.dll" target="lib\net40"/>
+		<file src="bin\Release\NETFastSearchLibrary.XML" target="lib\net40"/>
+	</files>
+</package>

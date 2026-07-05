@@ -13,9 +13,9 @@ namespace NETFastSearchLibrary
     /// Búsqueda recursiva rápida de archivos con métodos estáticos y API basada en eventos.
     /// </summary>
     /// <remarks>
-    /// Los métodos estáticos (<see cref="GetFiles"/>, <see cref="GetFilesFast"/>, etc.) devuelven
-    /// el resultado completo al finalizar. La API por instancia notifica lotes mediante
-    /// <see cref="FilesFound"/> mientras la búsqueda está en curso.
+    /// Los métodos estáticos (<see cref="GetFiles(string, string)"/>,
+    /// <see cref="GetFilesFast(string, string)"/>, etc.) devuelven el resultado completo al finalizar.
+    /// La API por instancia notifica lotes mediante <see cref="FilesFound"/> mientras la búsqueda está en curso.
     /// </remarks>
     public class FileSearch
     {
@@ -63,7 +63,6 @@ namespace NETFastSearchLibrary
 
         #region FilePatternSearch constructors 
 
-        /// <summary>
         /// <summary>
         /// Inicializa una nueva instancia de <see cref="FileSearch"/> con patrón de búsqueda.
         /// </summary>

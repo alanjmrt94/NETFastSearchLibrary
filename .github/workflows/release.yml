@@ -1,0 +1,129 @@
+# Release oficial: strong-name + push a nuget.org (Author Signing opcional si hay certificado)
+# Disparador: tag semver v* (ej. v1.0.4)
+name: Release
+
+on:
+  push:
+    tags:
+      - v*
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build, sign and publish
+    runs-on: windows-latest
+    environment: release
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Extract version from tag
+        id: version
+        shell: pwsh
+        run: |
+          $tag = '${{ github.ref_name }}'
+          if ($tag -notmatch '^v(?<ver>.+)$') {
+            throw "Tag inválido: $tag (esperado vMAJOR.MINOR.PATCH)"
+          }
+          "version=$($Matches['ver'])" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+
+      - name: Setup NuGet
+        uses: nuget/setup-nuget@v2
+        with:
+          nuget-version: 6.x
+
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Restore packages
+        run: nuget restore NETFastSearchLibrary.sln
+
+      - name: Prepare signing keys
+        id: prepare
+        shell: pwsh
+        env:
+          EMZAPPS_SNK: ${{ secrets.EMZAPPS_SNK }}
+          NUGET_SIGN_CERT_PFX: ${{ secrets.NUGET_SIGN_CERT_PFX }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:EMZAPPS_SNK)) {
+            throw 'Falta el secreto EMZAPPS_SNK (strong-name, base64).'
+          }
+
+          $snkPath = Join-Path $env:GITHUB_WORKSPACE 'NETFastSearchLibrary\EMZApps.snk'
+          [IO.File]::WriteAllBytes($snkPath, [Convert]::FromBase64String($env:EMZAPPS_SNK))
+
+          if (-not [string]::IsNullOrWhiteSpace($env:NUGET_SIGN_CERT_PFX)) {
+            $pfxPath = Join-Path $env:GITHUB_WORKSPACE 'nuget-sign.pfx'
+            [IO.File]::WriteAllBytes($pfxPath, [Convert]::FromBase64String($env:NUGET_SIGN_CERT_PFX))
+            "author_sign=true" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+            Write-Host "Author Signing: habilitado (certificado presente)."
+          } else {
+            "author_sign=false" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+            Write-Host "Author Signing: omitido (sin NUGET_SIGN_CERT_PFX). nuget.org firmará el repositorio."
+          }
+
+      - name: Build Release (strong-name)
+        run: msbuild NETFastSearchLibrary\NETFastSearchLibrary.csproj /p:Configuration=Release /p:Platform=AnyCPU /p:OfficialBuild=true /t:Rebuild /verbosity:minimal
+
+      - name: Pack NuGet
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path artifacts | Out-Null
+          nuget pack NETFastSearchLibrary\NETFastSearchLibrary.Legacy.nuspec `
+            -Version '${{ steps.version.outputs.version }}' `
+            -OutputDirectory artifacts `
+            -Properties "Configuration=Release;commit=${{ github.sha }}"
+
+      - name: Sign NuGet package (Author / Authenticode)
+        if: steps.prepare.outputs.author_sign == 'true'
+        shell: pwsh
+        env:
+          NUGET_SIGN_CERT_PASSWORD: ${{ secrets.NUGET_SIGN_CERT_PASSWORD }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:NUGET_SIGN_CERT_PASSWORD)) {
+            throw 'NUGET_SIGN_CERT_PFX está definido pero falta NUGET_SIGN_CERT_PASSWORD.'
+          }
+
+          $nupkg = Get-ChildItem artifacts\*.nupkg | Select-Object -First 1
+          if (-not $nupkg) { throw 'No se generó ningún .nupkg.' }
+
+          nuget sign $nupkg.FullName `
+            -CertificatePath "$env:GITHUB_WORKSPACE\nuget-sign.pfx" `
+            -CertificatePassword "$env:NUGET_SIGN_CERT_PASSWORD" `
+            -Timestamper http://timestamp.digicert.com `
+            -TimestampHashAlgorithm SHA256 `
+            -HashAlgorithm SHA256 `
+            -NonInteractive
+
+      - name: Verify NuGet Author signature
+        if: steps.prepare.outputs.author_sign == 'true'
+        shell: pwsh
+        run: |
+          $nupkg = Get-ChildItem artifacts\*.nupkg | Select-Object -First 1
+          nuget verify -Signatures $nupkg.FullName
+
+      - name: Push to NuGet.org
+        shell: pwsh
+        env:
+          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:NUGET_API_KEY)) {
+            throw 'Falta el secreto NUGET_API_KEY.'
+          }
+          nuget push artifacts\*.nupkg `
+            -Source https://api.nuget.org/v3/index.json `
+            -ApiKey $env:NUGET_API_KEY `
+            -SkipDuplicate
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: ${{ github.ref_name }}
+          files: |
+            artifacts/*.nupkg
+            NETFastSearchLibrary/bin/Release/NETFastSearchLibrary.dll
+            NETFastSearchLibrary/bin/Release/NETFastSearchLibrary.XML
+          generate_release_notes: true

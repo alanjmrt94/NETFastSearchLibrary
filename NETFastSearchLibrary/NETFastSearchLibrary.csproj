@@ -39,10 +39,16 @@
 		<RunCodeAnalysis>false</RunCodeAnalysis>
 		<CodeAnalysisRuleSet>MinimumRecommendedRules.ruleset</CodeAnalysisRuleSet>
 		<Prefer32Bit>false</Prefer32Bit>
+		<DocumentationFile>bin\Release\NETFastSearchLibrary.XML</DocumentationFile>
 	</PropertyGroup>
 	<PropertyGroup/>
 	<PropertyGroup>
 		<ApplicationIcon>fsl.ico</ApplicationIcon>
+	</PropertyGroup>
+	<!-- Firma strong-name solo en builds oficiales (CI). Ver README / EMZApps.snk en secretos. -->
+	<PropertyGroup Condition="'$(OfficialBuild)' == 'true'">
+		<SignAssembly>true</SignAssembly>
+		<AssemblyOriginatorKeyFile>EMZApps.snk</AssemblyOriginatorKeyFile>
 	</PropertyGroup>
 	<PropertyGroup>
 		<ApplicationManifest>app.manifest</ApplicationManifest>

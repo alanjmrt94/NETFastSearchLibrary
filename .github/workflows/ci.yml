@@ -1,0 +1,36 @@
+# Compilación de verificación (sin firmas). Ejecuta en PR y push a main.
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+    branches:
+      - main
+      - master
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build (unsigned)
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup NuGet
+        uses: nuget/setup-nuget@v2
+
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Restore packages
+        run: nuget restore NETFastSearchLibrary.sln
+
+      - name: Build Release
+        run: msbuild NETFastSearchLibrary\NETFastSearchLibrary.csproj /p:Configuration=Release /p:Platform=AnyCPU /t:Rebuild /verbosity:minimal

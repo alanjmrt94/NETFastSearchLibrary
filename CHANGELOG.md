@@ -11,6 +11,11 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/
 ### Added
 
 - Helpers internos: `SearchIoHelper`, `PathHelper`, `ParallelSearchHelper`.
+- GitHub Actions: `ci.yml` (build Release unsigned en PR/push) y `release.yml` (strong-name + pack + push NuGet + GitHub Release en tag `v*`).
+- `NETFastSearchLibrary.Legacy.nuspec` para publicación en [nuget.org](https://www.nuget.org/packages/NETFastSearchLibrary.Legacy).
+- Scripts de release: `scripts/release.ps1` (Windows), `scripts/build-dist.sh` (Linux), `scripts/release.env.example`.
+- Exportación base64 de claves (`--export-snk-base64`, `--export-pfx-base64`) para secretos de CI; archivos `*_base64` en `.gitignore`.
+- Strong-name oficial `EMZApps.snk` (token `a8ab9e59c05f5f54`); firma solo con `OfficialBuild=true` (CI / mantenedores).
 
 ### Fixed
 
@@ -19,6 +24,7 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/
 - Detección de ciclos en el árbol de directorios (junctions / symlinks).
 - `FileSearchBase.OnSearchCompleted` maneja `AggregateException` cuando `ExecuteHandlers.InNewTask`.
 - `app.manifest` sin `longPathAware` (compatible con objetivo Windows XP).
+- Comentarios XML en `FileSearch`: `cref` ambiguos en `GetFiles`/`GetFilesFast` y `<summary>` duplicado en constructor.
 
 ### Changed
 
@@ -26,10 +32,16 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/
 - Paralelismo acotado con `WithDegreeOfParallelism` = `Environment.ProcessorCount`.
 - Mensajes de validación de argumentos en español.
 - `FileEventArgs` realiza copia defensiva de la lista de archivos.
-- README: requisito Visual Studio 2015+ (`nameof`); nota sobre junctions.
-- Deshabilitada firma de ensamblado; eliminada referencia a `PaatyDSMApps96.pfx`.
+- Firma de ensamblado: reemplaza certificado legacy `PaatyDSMApps96.pfx` por strong-name `EMZApps.snk` (no versionado).
+- Release CI y `release.ps1`: NuGet Author Signing **opcional**; publicación por defecto unsigned (Repository Signing en nuget.org).
+- `NETFastSearchLibrary.csproj`: documentación XML en configuración Release; firma condicional `OfficialBuild`.
+- README: requisito Visual Studio 2015+; compilación local vs oficial; instalación NuGet; guía de secretos GitHub/nuget.org.
+- `.gitignore`: `*.snk`, `*_base64`, `scripts/release.env`, `dist/`.
 - Eliminado `PackageReference` duplicado; restauración NuGet vía `packages.config`.
-- README: sección «Compilar desde el código fuente (Windows)».
+
+### Removed
+
+- Referencia a `PaatyDSMApps96.pfx` y `SignAssembly` permanente en el `.csproj`.
 
 ## [1.0.3] - 2026-07-05
 
