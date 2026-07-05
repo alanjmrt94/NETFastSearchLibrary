@@ -245,8 +245,18 @@ push_nuget() {
     echo "Defina NUGET_API_KEY en $ENV_FILE o en el entorno." >&2
     return 1
   }
-  command -v nuget >/dev/null || { echo "nuget no encontrado." >&2; return 1; }
+
   echo "==> Publicando en nuget.org"
+  # dotnet CLI usa OpenSSL del sistema; nuget.exe (Mono) falla con CERTIFICATE_VERIFY_FAILED en Linux.
+  if command -v dotnet >/dev/null 2>&1; then
+    dotnet nuget push "$nupkg" \
+      --source https://api.nuget.org/v3/index.json \
+      --api-key "$NUGET_API_KEY" \
+      --skip-duplicate
+    return $?
+  fi
+
+  command -v nuget >/dev/null || { echo "Se requiere dotnet CLI o nuget.exe." >&2; return 1; }
   nuget push "$nupkg" -Source https://api.nuget.org/v3/index.json \
     -ApiKey "$NUGET_API_KEY" -SkipDuplicate
 }
@@ -373,7 +383,7 @@ Repo GitHub: $GITHUB_REPO
 
 Notas
   - Compilación: msbuild (preferido) o xbuild. En Ubuntu instale mono-complete del repo oficial Mono.
-  - En Linux no use 'nuget restore' (SSL Mono + MSBUILD0004); use restore-packages.sh.
+  - En Linux: nuget pack/push con nuget.exe (Mono) falla SSL; pack usa rutas del nuspec, push usa dotnet nuget push.
   - nuget sign (Author Signing) requiere Windows; aquí se publica unsigned (Repository Signing).
   - Si empuja el tag, CI puede duplicar NuGet/GitHub Release — use una vía u otra.
 
