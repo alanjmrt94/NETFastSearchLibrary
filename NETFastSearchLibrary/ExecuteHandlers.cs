@@ -1,17 +1,17 @@
 ﻿namespace NETFastSearchLibrary
 {
     /// <summary>
-    /// Specifies where event handlers are executed.
+    /// Especifica dónde se ejecutan los manejadores de eventos durante la búsqueda.
     /// </summary>
     public enum ExecuteHandlers
     {
         /// <summary>
-        /// To execute event handlers in current task. 
+        /// Los manejadores se ejecutan en la misma tarea donde se encontraron los archivos.
         /// </summary>
         InCurrentTask = 0,
 
         /// <summary>
-        /// To execute event handlers in new task.
+        /// Los manejadores se ejecutan en una tarea nueva del pool de hilos.
         /// </summary>
         InNewTask = 1
     }

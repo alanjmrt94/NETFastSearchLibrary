@@ -10,8 +10,13 @@ namespace NETFastSearchLibrary
 {
 
     /// <summary>
-    /// Represents a class for fast file search.
+    /// Búsqueda recursiva rápida de archivos con métodos estáticos y API basada en eventos.
     /// </summary>
+    /// <remarks>
+    /// Los métodos estáticos (<see cref="GetFiles"/>, <see cref="GetFilesFast"/>, etc.) devuelven
+    /// el resultado completo al finalizar. La API por instancia notifica lotes mediante
+    /// <see cref="FilesFound"/> mientras la búsqueda está en curso.
+    /// </remarks>
     public class FileSearch
     {
         #region Instance members
@@ -21,7 +26,9 @@ namespace NETFastSearchLibrary
         private CancellationTokenSource tokenSource;
 
         /// <summary>
-        /// Event fires when next portion of files is found. Event handlers are not thread safe. 
+        /// Se dispara cuando se encuentra un nuevo lote de archivos.
+        /// Los manejadores no son seguros entre hilos; use <c>lock</c> o colecciones de
+        /// <see cref="System.Collections.Concurrent"/> namespace.
         /// </summary>
         public event EventHandler<FileEventArgs> FilesFound
         {
@@ -38,7 +45,7 @@ namespace NETFastSearchLibrary
 
 
         /// <summary>
-        /// Event fires when search process is completed or stopped. 
+        /// Se dispara cuando la búsqueda finaliza o se detiene con <see cref="StopSearch"/>.
         /// </summary>
         public event EventHandler<SearchCompletedEventArgs> SearchCompleted
         {
@@ -57,11 +64,12 @@ namespace NETFastSearchLibrary
         #region FilePatternSearch constructors 
 
         /// <summary>
-        /// Initializes a new instance of FileSearch class.
+        /// <summary>
+        /// Inicializa una nueva instancia de <see cref="FileSearch"/> con patrón de búsqueda.
         /// </summary>
-        /// <param name="folder">The start search directory.</param>
-        /// <param name="pattern">The search pattern.</param>
-        /// <param name="handlerOption">Specifies where FilesFound event handlers are executed.</param>
+        /// <param name="folder">Directorio raíz donde comienza la búsqueda.</param>
+        /// <param name="pattern">Patrón de búsqueda (comodines <c>*</c> y <c>?</c>).</param>
+        /// <param name="handlerOption">Define dónde se ejecutan los manejadores de <see cref="FilesFound"/>.</param>
         /// <exception cref="ArgumentException"></exception>
         /// <exception cref="ArgumentNullException"></exception>
         public FileSearch(string folder, string pattern, ExecuteHandlers handlerOption)
@@ -75,10 +83,10 @@ namespace NETFastSearchLibrary
 
 
         /// <summary>
-        /// Initializes a new instance of FileSearch class.
+        /// Inicializa una nueva instancia de <see cref="FileSearch"/> con patrón de búsqueda.
         /// </summary>
-        /// <param name="folder">The start search directory.</param>
-        /// <param name="pattern">The search pattern.</param>
+        /// <param name="folder">Directorio raíz donde comienza la búsqueda.</param>
+        /// <param name="pattern">Patrón de búsqueda (comodines <c>*</c> y <c>?</c>).</param>
         /// <exception cref="ArgumentException"></exception>
         /// <exception cref="ArgumentNullException"></exception>
         public FileSearch(string folder, string pattern) : this(folder, pattern, ExecuteHandlers.InCurrentTask)
@@ -87,9 +95,9 @@ namespace NETFastSearchLibrary
 
 
         /// <summary>
-        /// Initializes a new instance of FileSearch class.
+        /// Inicializa una nueva instancia de <see cref="FileSearch"/> en el directorio indicado (patrón <c>*</c>).
         /// </summary>
-        /// <param name="folder">The start search directory.</param>
+        /// <param name="folder">Directorio raíz donde comienza la búsqueda.</param>
         /// <exception cref="ArgumentException"></exception>
         /// <exception cref="ArgumentNullException"></exception>
         public FileSearch(string folder) : this(folder, "*", ExecuteHandlers.InCurrentTask)
@@ -103,11 +111,11 @@ namespace NETFastSearchLibrary
 
 
         /// <summary>
-        /// Initializes a new instance of FileSearch class.
+        /// Inicializa una nueva instancia de <see cref="FileSearch"/> con delegado de filtrado.
         /// </summary>
-        /// <param name="folder">The start search directory.</param>
-        /// <param name="isValid">The delegate that determines algorithm of file selection.</param>
-        /// <param name="handlerOption">Specifies where FilesFound event handlers are executed.</param>
+        /// <param name="folder">Directorio raíz donde comienza la búsqueda.</param>
+        /// <param name="isValid">Delegado que determina si un archivo se incluye en el resultado.</param>
+        /// <param name="handlerOption">Define dónde se ejecutan los manejadores de <see cref="FilesFound"/>.</param>
         /// <exception cref="ArgumentException"></exception>
         /// <exception cref="ArgumentNullException"></exception>
         public FileSearch(string folder, Func<FileInfo, bool> isValid, ExecuteHandlers handlerOption)
@@ -121,10 +129,10 @@ namespace NETFastSearchLibrary
 
 
         /// <summary>
-        /// Initializes a new instance of FileSearch class.
+        /// Inicializa una nueva instancia de <see cref="FileSearch"/> con delegado de filtrado.
         /// </summary>
-        /// <param name="folder">The start search directory.</param>
-        /// <param name="isValid">The delegate that determines algorithm of file selection.</param>
+        /// <param name="folder">Directorio raíz donde comienza la búsqueda.</param>
+        /// <param name="isValid">Delegado que determina si un archivo se incluye en el resultado.</param>
         /// <exception cref="ArgumentException"></exception>
         /// <exception cref="ArgumentNullException"></exception>
         public FileSearch(string folder, Func<FileInfo, bool> isValid)
@@ -138,13 +146,13 @@ namespace NETFastSearchLibrary
         #region FileCancellationPatternSearch constructors
 
         /// <summary>
-        /// Initializes a new instance of FileSearch class.
+        /// Inicializa una nueva instancia de <see cref="FileSearch"/> con patrón de búsqueda y cancelación.
         /// </summary>
-        /// <param name="folder">The start search directory.</param>
-        /// <param name="pattern">The search pattern.</param>
-        /// <param name="tokenSource">Instance of CancellationTokenSource for search process cancellation possibility.</param>
-        /// <param name="handlerOption">Specifies where FilesFound event handlers are executed.</param>
-        /// <param name="suppressOperationCanceledException">Determines whether necessary suppress OperationCanceledException if it possible.</param>
+        /// <param name="folder">Directorio raíz donde comienza la búsqueda.</param>
+        /// <param name="pattern">Patrón de búsqueda (comodines <c>*</c> y <c>?</c>).</param>
+        /// <param name="tokenSource"><see cref="CancellationTokenSource"/> que permite cancelar la búsqueda.</param>
+        /// <param name="handlerOption">Define dónde se ejecutan los manejadores de <see cref="FilesFound"/>.</param>
+        /// <param name="suppressOperationCanceledException"><c>true</c> para suprimir <see cref="OperationCanceledException"/> al cancelar; <c>false</c> para propagarla.</param>
         /// <exception cref="ArgumentException"></exception>
         /// <exception cref="ArgumentNullException"></exception>
         public FileSearch(string folder, string pattern, CancellationTokenSource tokenSource, ExecuteHandlers handlerOption, bool suppressOperationCanceledException)
@@ -161,12 +169,12 @@ namespace NETFastSearchLibrary
 
 
         /// <summary>
-        /// Initializes a new instance of FileSearch class.
+        /// Inicializa una nueva instancia de <see cref="FileSearch"/> con patrón de búsqueda.
         /// </summary>
-        /// <param name="folder">The start search directory.</param>
-        /// <param name="pattern">The search pattern.</param>
-        /// <param name="tokenSource">Instance of CancellationTokenSource for search process cancellation possibility.</param>
-        /// <param name="handlerOption">Specifies where FilesFound event handlers are executed.</param>
+        /// <param name="folder">Directorio raíz donde comienza la búsqueda.</param>
+        /// <param name="pattern">Patrón de búsqueda (comodines <c>*</c> y <c>?</c>).</param>
+        /// <param name="tokenSource"><see cref="CancellationTokenSource"/> que permite cancelar la búsqueda.</param>
+        /// <param name="handlerOption">Define dónde se ejecutan los manejadores de <see cref="FilesFound"/>.</param>
         /// <exception cref="ArgumentException"></exception>
         /// <exception cref="ArgumentNullException"></exception>
         public FileSearch(string folder, string pattern, CancellationTokenSource tokenSource, ExecuteHandlers handlerOption)
@@ -176,11 +184,11 @@ namespace NETFastSearchLibrary
 
 
         /// <summary>
-        /// Initializes a new instance of FileSearch class.
+        /// Inicializa una nueva instancia de <see cref="FileSearch"/> con patrón de búsqueda.
         /// </summary>
-        /// <param name="folder">The start search directory.</param>
-        /// <param name="pattern">The search pattern.</param>
-        /// <param name="tokenSource">Instance of CancellationTokenSource for search process cancellation possibility.</param>
+        /// <param name="folder">Directorio raíz donde comienza la búsqueda.</param>
+        /// <param name="pattern">Patrón de búsqueda (comodines <c>*</c> y <c>?</c>).</param>
+        /// <param name="tokenSource"><see cref="CancellationTokenSource"/> que permite cancelar la búsqueda.</param>
         /// <exception cref="ArgumentException"></exception>
         /// <exception cref="ArgumentNullException"></exception>
         public FileSearch(string folder, string pattern, CancellationTokenSource tokenSource) 
@@ -190,10 +198,10 @@ namespace NETFastSearchLibrary
 
 
         /// <summary>
-        /// Initializes a new instance of FileSearch class.
+        /// Inicializa una nueva instancia de <see cref="FileSearch"/> en el directorio indicado (patrón <c>*</c>).
         /// </summary>
-        /// <param name="folder">The start search directory.</param>
-        /// <param name="tokenSource">Instance of CancellationTokenSource for search process cancellation possibility.</param>
+        /// <param name="folder">Directorio raíz donde comienza la búsqueda.</param>
+        /// <param name="tokenSource"><see cref="CancellationTokenSource"/> que permite cancelar la búsqueda.</param>
         /// <exception cref="ArgumentException"></exception>
         /// <exception cref="ArgumentNullException"></exception>
         public FileSearch(string folder, CancellationTokenSource tokenSource) 
@@ -207,13 +215,13 @@ namespace NETFastSearchLibrary
         #region FileCancellationDelegateSearch constructors
 
         /// <summary>
-        /// Initializes a new instance of FileSearch class.
+        /// Inicializa una nueva instancia de <see cref="FileSearch"/> con delegado de filtrado y cancelación.
         /// </summary>
-        /// <param name="folder">The start search directory.</param>
-        /// <param name="isValid">The delegate that determines algorithm of file selection.</param>
-        /// <param name="tokenSource">Instance of CancellationTokenSource for search process cancellation possibility.</param>
-        /// <param name="handlerOption">Specifies where FilesFound event handlers are executed.</param>
-        /// <param name="suppressOperationCanceledException">Determines whether necessary suppress OperationCanceledException if it possible.</param>
+        /// <param name="folder">Directorio raíz donde comienza la búsqueda.</param>
+        /// <param name="isValid">Delegado que determina si un archivo se incluye en el resultado.</param>
+        /// <param name="tokenSource"><see cref="CancellationTokenSource"/> que permite cancelar la búsqueda.</param>
+        /// <param name="handlerOption">Define dónde se ejecutan los manejadores de <see cref="FilesFound"/>.</param>
+        /// <param name="suppressOperationCanceledException"><c>true</c> para suprimir <see cref="OperationCanceledException"/> al cancelar; <c>false</c> para propagarla.</param>
         /// <exception cref="ArgumentException"></exception>
         /// <exception cref="ArgumentNullException"></exception>
         public FileSearch(string folder, Func<FileInfo, bool> isValid, CancellationTokenSource tokenSource, ExecuteHandlers handlerOption, bool suppressOperationCanceledException)
@@ -230,12 +238,12 @@ namespace NETFastSearchLibrary
 
 
         /// <summary>
-        /// Initializes a new instance of FileSearch class.
+        /// Inicializa una nueva instancia de <see cref="FileSearch"/> con delegado de filtrado y cancelación.
         /// </summary>
-        /// <param name="folder">The start search directory.</param>
-        /// <param name="isValid">The delegate that determines algorithm of file selection.</param>
-        /// <param name="tokenSource">Instance of CancellationTokenSource for search process cancellation possibility.</param>
-        /// <param name="handlerOption">Specifies where FilesFound event handlers are executed.</param>
+        /// <param name="folder">Directorio raíz donde comienza la búsqueda.</param>
+        /// <param name="isValid">Delegado que determina si un archivo se incluye en el resultado.</param>
+        /// <param name="tokenSource"><see cref="CancellationTokenSource"/> que permite cancelar la búsqueda.</param>
+        /// <param name="handlerOption">Define dónde se ejecutan los manejadores de <see cref="FilesFound"/>.</param>
         /// <exception cref="ArgumentException"></exception>
         /// <exception cref="ArgumentNullException"></exception>
         public FileSearch(string folder, Func<FileInfo, bool> isValid, CancellationTokenSource tokenSource, ExecuteHandlers handlerOption)
@@ -245,11 +253,11 @@ namespace NETFastSearchLibrary
 
 
         /// <summary>
-        /// Initializes a new instance of FileSearch class.
+        /// Inicializa una nueva instancia de <see cref="FileSearch"/> con delegado de filtrado y cancelación.
         /// </summary>
-        /// <param name="folder">The start search directory.</param>
-        /// <param name="isValid">The delegate that determines algorithm of file selection.</param>
-        /// <param name="tokenSource">Instance of CancellationTokenSource for search process cancellation possibility.</param>
+        /// <param name="folder">Directorio raíz donde comienza la búsqueda.</param>
+        /// <param name="isValid">Delegado que determina si un archivo se incluye en el resultado.</param>
+        /// <param name="tokenSource"><see cref="CancellationTokenSource"/> que permite cancelar la búsqueda.</param>
         /// <exception cref="ArgumentException"></exception>
         /// <exception cref="ArgumentNullException"></exception>
         public FileSearch(string folder, Func<FileInfo, bool> isValid, CancellationTokenSource tokenSource)
@@ -305,7 +313,7 @@ namespace NETFastSearchLibrary
 
 
         /// <summary>
-        /// Starts a file search operation with realtime reporting using several threads in thread pool.
+        /// Inicia la búsqueda con notificación en tiempo real usando el pool de hilos.
         /// </summary>
         public void StartSearch()
         {
@@ -314,8 +322,9 @@ namespace NETFastSearchLibrary
 
 
         /// <summary>
-        /// Starts a file search operation with realtime reporting using several threads in thread pool as an asynchronous operation.
+        /// Inicia la búsqueda de forma asíncrona con notificación en tiempo real.
         /// </summary>
+        /// <returns>Tarea que representa la operación de búsqueda.</returns>
         public Task StartSearchAsync()
         {
             if (searcher is FileCancellationSearchBase)
@@ -335,9 +344,9 @@ namespace NETFastSearchLibrary
 
 
         /// <summary>
-        /// Stops a file search operation.
+        /// Detiene la búsqueda en curso. Requiere un constructor con <see cref="CancellationTokenSource"/>.
         /// </summary>
-        /// <exception cref="InvalidOperationException"></exception>
+        /// <exception cref="InvalidOperationException">Si la instancia no admite cancelación.</exception>
         public void StopSearch()
         {
             if (tokenSource == null)
@@ -355,11 +364,11 @@ namespace NETFastSearchLibrary
 
 
         /// <summary>
-        /// Returns a list of files that are contained in directory and all subdirectories.
+        /// Busca archivos de forma recursiva en un solo hilo y devuelve la lista completa.
         /// </summary>
-        /// <param name="folder">The start search directory.</param>
-        /// <param name="pattern">The search pattern.</param>
-        /// <returns>List of finding files</returns>
+        /// <param name="folder">Directorio raíz donde comienza la búsqueda.</param>
+        /// <param name="pattern">Patrón de búsqueda (comodines <c>*</c> y <c>?</c>).</param>
+        /// <returns>Lista de archivos encontrados.</returns>
         /// <exception cref="DirectoryNotFoundException"></exception>
         /// <exception cref="ArgumentNullException"></exception>
         static public List<FileInfo> GetFiles(string folder, string pattern = "*")
@@ -410,11 +419,11 @@ namespace NETFastSearchLibrary
 
 
         /// <summary>
-        /// Returns a list of files that are contained in directory and all subdirectories.
+        /// Busca archivos de forma recursiva en un solo hilo usando un delegado de filtrado.
         /// </summary>
-        /// <param name="folder">The start search directory.</param>
-        /// <param name="isValid">The delegate that determines algorithm of file selection.</param>
-        /// <returns>List of finding files.</returns>
+        /// <param name="folder">Directorio raíz donde comienza la búsqueda.</param>
+        /// <param name="isValid">Delegado que determina si un archivo se incluye en el resultado.</param>
+        /// <returns>Lista de archivos encontrados.</returns>
         /// <exception cref="DirectoryNotFoundException"></exception>
         /// <exception cref="ArgumentNullException"></exception>
         static public List<FileInfo> GetFiles(string folder, Func<FileInfo, bool> isValid)
@@ -481,10 +490,11 @@ namespace NETFastSearchLibrary
 
 
         /// <summary>
-        /// Returns a list of files that are contained in directory and all subdirectories as an asynchronous operation.
+        /// Busca archivos de forma recursiva en un solo hilo de manera asíncrona.
         /// </summary>
-        /// <param name="folder">The start search directory.</param>
-        /// <param name="pattern">The search pattern.</param>
+        /// <param name="folder">Directorio raíz donde comienza la búsqueda.</param>
+        /// <param name="pattern">Patrón de búsqueda (comodines <c>*</c> y <c>?</c>).</param>
+        /// <returns>Tarea con la lista de archivos encontrados.</returns>
         /// <exception cref="DirectoryNotFoundException"></exception>
         /// <exception cref="ArgumentNullException"></exception>
         static public Task<List<FileInfo>> GetFilesAsync(string folder, string pattern = "*")
@@ -498,10 +508,11 @@ namespace NETFastSearchLibrary
 
 
         /// <summary>
-        /// Returns a list of files that are contained in directory and all subdirectories as an asynchronous operation.
+        /// Busca archivos de forma recursiva en un solo hilo de manera asíncrona usando un delegado.
         /// </summary>
-        /// <param name="folder">The start search directory.</param>
-        /// <param name="isValid">The delegate that determines algorithm of file selection.</param>
+        /// <param name="folder">Directorio raíz donde comienza la búsqueda.</param>
+        /// <param name="isValid">Delegado que determina si un archivo se incluye en el resultado.</param>
+        /// <returns>Tarea con la lista de archivos encontrados.</returns>
         /// <exception cref="DirectoryNotFoundException"></exception>
         /// <exception cref="ArgumentNullException"></exception>
         static public Task<List<FileInfo>> GetFilesAsync(string folder, Func<FileInfo, bool> isValid)
@@ -515,11 +526,11 @@ namespace NETFastSearchLibrary
 
 
         /// <summary>
-        /// Returns a list of files that are contained in directory and all subdirectories using several threads of thread pool.
+        /// Busca archivos de forma recursiva usando el pool de hilos (más rápido en CPUs multinúcleo).
         /// </summary>
-        /// <param name="folder">The start search directory.</param>
-        /// <param name="pattern">The search pattern.</param>
-        /// <returns>List of finding files.</returns>
+        /// <param name="folder">Directorio raíz donde comienza la búsqueda.</param>
+        /// <param name="pattern">Patrón de búsqueda (comodines <c>*</c> y <c>?</c>).</param>
+        /// <returns>Lista de archivos encontrados.</returns>
         /// <exception cref="DirectoryNotFoundException"></exception>
         /// <exception cref="ArgumentNullException"></exception>
         static public List<FileInfo> GetFilesFast(string folder, string pattern = "*")
@@ -542,11 +553,11 @@ namespace NETFastSearchLibrary
 
 
         /// <summary>
-        /// Returns a list of files that are contained in directory and all subdirectories using several threads of thread pool.
+        /// Busca archivos de forma recursiva usando el pool de hilos y un delegado de filtrado.
         /// </summary>
-        /// <param name="folder">The start search directory.</param>
-        /// <param name="isValid">The delegate that determines algorithm of file selection.</param>
-        /// <returns>List of finding files.</returns>
+        /// <param name="folder">Directorio raíz donde comienza la búsqueda.</param>
+        /// <param name="isValid">Delegado que determina si un archivo se incluye en el resultado.</param>
+        /// <returns>Lista de archivos encontrados.</returns>
         /// <exception cref="DirectoryNotFoundException"></exception>
         /// <exception cref="ArgumentNullException"></exception>
         static public List<FileInfo> GetFilesFast(string folder, Func<FileInfo, bool> isValid)
@@ -569,10 +580,11 @@ namespace NETFastSearchLibrary
 
 
         /// <summary>
-        /// Returns a list of files that are contained in directory and all subdirectories using several threads of thread pool as an asynchronous operation.
+        /// Busca archivos de forma recursiva en el pool de hilos de manera asíncrona.
         /// </summary>
-        /// <param name="folder">The start search directory.</param>
-        /// <param name="pattern">The search pattern.</param>
+        /// <param name="folder">Directorio raíz donde comienza la búsqueda.</param>
+        /// <param name="pattern">Patrón de búsqueda (comodines <c>*</c> y <c>?</c>).</param>
+        /// <returns>Tarea con la lista de archivos encontrados.</returns>
         /// <exception cref="DirectoryNotFoundException"></exception>
         /// <exception cref="ArgumentNullException"></exception>
         static public Task<List<FileInfo>> GetFilesFastAsync(string folder, string pattern = "*")
@@ -586,10 +598,11 @@ namespace NETFastSearchLibrary
 
 
         /// <summary>
-        /// Returns a list of files that are contained in directory and all subdirectories using several threads of thread pool as an asynchronous operation.
+        /// Busca archivos de forma recursiva en el pool de hilos de manera asíncrona usando un delegado.
         /// </summary>
-        /// <param name="folder">The start search directory.</param>
-        /// <param name="isValid">The delegate that determines algorithm of file selection.</param>
+        /// <param name="folder">Directorio raíz donde comienza la búsqueda.</param>
+        /// <param name="isValid">Delegado que determina si un archivo se incluye en el resultado.</param>
+        /// <returns>Tarea con la lista de archivos encontrados.</returns>
         /// <exception cref="DirectoryNotFoundException"></exception>
         /// <exception cref="ArgumentNullException"></exception>
         static public Task<List<FileInfo>> GetFilesFastAsync(string folder, Func<FileInfo, bool> isValid)

@@ -6,6 +6,10 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/
 
 ## [Unreleased]
 
+### Changed
+
+- Comentarios XML (`///`) de la API pública traducidos al español (`FileSearch`, `FileSearchMultiple`, eventos, `ExecuteHandlers`).
+
 ## [1.0.3] - 2026-07-05
 
 ### Added

@@ -3,19 +3,19 @@
 namespace NETFastSearchLibrary
 {
     /// <summary>
-    /// Provides data for SearchCompleted event.
+    /// Proporciona datos para el evento <see cref="FileSearch.SearchCompleted"/>.
     /// </summary>
     public class SearchCompletedEventArgs : EventArgs
     {
         /// <summary>
-        /// Gets whether this search process has completed due cancellation.
+        /// Indica si la búsqueda finalizó porque se llamó a <see cref="FileSearch.StopSearch"/>.
         /// </summary>
         public bool IsCanceled { get; private set; }
 
         /// <summary>
-        /// Initialize a new instance of SearchCompletedEventArgs class that describes a SearchCompleted event.
+        /// Inicializa una nueva instancia de <see cref="SearchCompletedEventArgs"/>.
         /// </summary>
-        /// <param name="isCanceled">Determines whether search process canceled.</param>
+        /// <param name="isCanceled"><c>true</c> si la búsqueda fue cancelada; en caso contrario, <c>false</c>.</param>
         public SearchCompletedEventArgs(bool isCanceled)
         {
             IsCanceled = isCanceled;

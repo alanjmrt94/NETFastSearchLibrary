@@ -5,22 +5,22 @@ using System.IO;
 namespace NETFastSearchLibrary
 {
     /// <summary>
-    /// Provides data for FilesFound event.
+    /// Proporciona datos para el evento <see cref="FileSearch.FilesFound"/>.
     /// </summary>
-    public class FileEventArgs: EventArgs
+    public class FileEventArgs : EventArgs
     {
-         /// <summary>
-         /// Gets a list of finding files.
-         /// </summary>
-         public List<FileInfo> Files { get; private set; }
+        /// <summary>
+        /// Obtiene el lote de archivos encontrados en esta notificación.
+        /// </summary>
+        public List<FileInfo> Files { get; private set; }
 
-         /// <summary>
-         /// Initialize a new instance of FileEventArgs class that describes a FilesFound event.
-         /// </summary>
-         /// <param name="files">The list of finding files.</param>
-         public FileEventArgs(List<FileInfo> files)
-         {
-             Files = files;
-         }
+        /// <summary>
+        /// Inicializa una nueva instancia de <see cref="FileEventArgs"/>.
+        /// </summary>
+        /// <param name="files">Lista de archivos encontrados.</param>
+        public FileEventArgs(List<FileInfo> files)
+        {
+            Files = files;
+        }
     }
 }

@@ -7,8 +7,12 @@ using System.Threading.Tasks;
 namespace NETFastSearchLibrary
 {
     /// <summary>
-    /// Represents a class for fast file search in multiple directories.
+    /// Búsqueda recursiva rápida de archivos en varias carpetas raíz con API basada en eventos.
     /// </summary>
+    /// <remarks>
+    /// Agrupa varias búsquedas en una sola instancia; todos los directorios comparten los mismos
+    /// manejadores de <see cref="FilesFound"/> y un único <see cref="SearchCompleted"/>.
+    /// </remarks>
     public class FileSearchMultiple
     {
         private List<FileSearchBase> searchers;
@@ -19,7 +23,8 @@ namespace NETFastSearchLibrary
 
 
         /// <summary>
-        /// Event fires when next portion of files is found. Event handlers are not thread safe. 
+        /// Se dispara cuando se encuentra un nuevo lote de archivos en cualquiera de las carpetas.
+        /// Los manejadores no son seguros entre hilos; use <c>lock</c> o colecciones concurrentes.
         /// </summary>
         public event EventHandler<FileEventArgs> FilesFound
         {
@@ -36,16 +41,16 @@ namespace NETFastSearchLibrary
 
 
         /// <summary>
-        /// Event fires when search process is completed or stopped.
+        /// Se dispara cuando todas las búsquedas finalizan o se detienen con <see cref="StopSearch"/>.
         /// </summary>
         public event EventHandler<SearchCompletedEventArgs> SearchCompleted;
 
 
 
         /// <summary>
-        /// Calls a SearchCompleted event.
+        /// Dispara el evento <see cref="SearchCompleted"/>.
         /// </summary>
-        /// <param name="isCanceled">Determines whether search process canceled.</param>
+        /// <param name="isCanceled"><c>true</c> si la búsqueda fue cancelada.</param>
         protected virtual void OnSearchCompleted(bool isCanceled)
         {
             EventHandler<SearchCompletedEventArgs> handler = SearchCompleted;
@@ -62,13 +67,13 @@ namespace NETFastSearchLibrary
         #region FileCancellationDelegateSearch constructors
 
         /// <summary>
-        /// Initializes a new instance of FileSearchMultiple class.
+        /// Inicializa búsqueda múltiple con delegado de filtrado y cancelación.
         /// </summary>
-        /// <param name="folders">Start search directories.</param>
-        /// <param name="isValid">The delegate that determines algorithm of file selection.</param>
-        /// <param name="tokenSource">Instance of CancellationTokenSource for search process cancellation possibility.</param>
-        /// <param name="handlerOption">Specifies where FilesFound event handlers are executed.</param>
-        /// <param name="suppressOperationCanceledException">Determines whether necessary suppress OperationCanceledException if it possible.</param>
+        /// <param name="folders">Lista de directorios raíz.</param>
+        /// <param name="isValid">Delegado que determina si un archivo se incluye en el resultado.</param>
+        /// <param name="tokenSource"><see cref="CancellationTokenSource"/> compartido para cancelar todas las búsquedas.</param>
+        /// <param name="handlerOption">Define dónde se ejecutan los manejadores de <see cref="FilesFound"/>.</param>
+        /// <param name="suppressOperationCanceledException"><c>true</c> para suprimir <see cref="OperationCanceledException"/> al cancelar.</param>
         /// <exception cref="ArgumentException"></exception>
         /// <exception cref="ArgumentNullException"></exception>
         public FileSearchMultiple(List<string> folders, Func<FileInfo, bool> isValid, CancellationTokenSource tokenSource, ExecuteHandlers handlerOption, bool suppressOperationCanceledException)
@@ -93,12 +98,12 @@ namespace NETFastSearchLibrary
 
 
         /// <summary>
-        /// Initializes a new instance of FileSearchMultiple class.
+        /// Inicializa búsqueda múltiple con delegado de filtrado y cancelación.
         /// </summary>
-        /// <param name="folders">Start search directories.</param>
-        /// <param name="isValid">The delegate that determines algorithm of file selection.</param>
-        /// <param name="tokenSource">Instance of CancellationTokenSource for search process cancellation possibility.</param>
-        /// <param name="handlerOption">Specifies where FilesFound event handlers are executed.</param>
+        /// <param name="folders">Lista de directorios raíz.</param>
+        /// <param name="isValid">Delegado que determina si un archivo se incluye en el resultado.</param>
+        /// <param name="tokenSource"><see cref="CancellationTokenSource"/> compartido para cancelar todas las búsquedas.</param>
+        /// <param name="handlerOption">Define dónde se ejecutan los manejadores de <see cref="FilesFound"/>.</param>
         /// <exception cref="ArgumentException"></exception>
         /// <exception cref="ArgumentNullException"></exception>
         public FileSearchMultiple(List<string> folders, Func<FileInfo, bool> isValid, CancellationTokenSource tokenSource, ExecuteHandlers handlerOption)
@@ -108,11 +113,11 @@ namespace NETFastSearchLibrary
 
 
         /// <summary>
-        /// Initializes a new instance of FileSearchMultiple class.
+        /// Inicializa búsqueda múltiple con delegado de filtrado y cancelación.
         /// </summary>
-        /// <param name="folders">Start search directories.</param>
-        /// <param name="isValid">The delegate that determines algorithm of file selection.</param>
-        /// <param name="tokenSource">Instance of CancellationTokenSource for search process cancellation possibility.</param>
+        /// <param name="folders">Lista de directorios raíz.</param>
+        /// <param name="isValid">Delegado que determina si un archivo se incluye en el resultado.</param>
+        /// <param name="tokenSource"><see cref="CancellationTokenSource"/> compartido para cancelar todas las búsquedas.</param>
         /// <exception cref="ArgumentException"></exception>
         /// <exception cref="ArgumentNullException"></exception>
         public FileSearchMultiple(List<string> folders, Func<FileInfo, bool> isValid, CancellationTokenSource tokenSource)
@@ -126,13 +131,13 @@ namespace NETFastSearchLibrary
         #region FileCancellationPatternSearch constructors
 
         /// <summary>
-        /// Initializes a new instance of FileSearchMultiple class.
+        /// Inicializa búsqueda múltiple con patrón de búsqueda y cancelación.
         /// </summary>
-        /// <param name="folders">Start search directories.</param>
-        /// <param name="pattern">The search pattern.</param>
-        /// <param name="tokenSource">Instance of CancellationTokenSource for search process cancellation possibility.</param>
-        /// <param name="handlerOption">Specifies where FilesFound event handlers are executed.</param>
-        /// <param name="suppressOperationCanceledException">Determines whether necessary suppress OperationCanceledException if it possible.</param>
+        /// <param name="folders">Lista de directorios raíz.</param>
+        /// <param name="pattern">Patrón de búsqueda (comodines <c>*</c> y <c>?</c>).</param>
+        /// <param name="tokenSource"><see cref="CancellationTokenSource"/> compartido para cancelar todas las búsquedas.</param>
+        /// <param name="handlerOption">Define dónde se ejecutan los manejadores de <see cref="FilesFound"/>.</param>
+        /// <param name="suppressOperationCanceledException"><c>true</c> para suprimir <see cref="OperationCanceledException"/> al cancelar.</param>
         /// <exception cref="ArgumentException"></exception>
         /// <exception cref="ArgumentNullException"></exception>
         public FileSearchMultiple(List<string> folders, string pattern, CancellationTokenSource tokenSource, ExecuteHandlers handlerOption, bool suppressOperationCanceledException)
@@ -157,12 +162,12 @@ namespace NETFastSearchLibrary
 
 
         /// <summary>
-        /// Initializes a new instance of FileSearchMultiple class.
+        /// Inicializa búsqueda múltiple con patrón de búsqueda y cancelación.
         /// </summary>
-        /// <param name="folders">Start search directories.</param>
-        /// <param name="pattern">The search pattern.</param>
-        /// <param name="tokenSource">Instance of CancellationTokenSource for search process cancellation possibility.</param>
-        /// <param name="handlerOption">Specifies where FilesFound event handlers are executed.</param>
+        /// <param name="folders">Lista de directorios raíz.</param>
+        /// <param name="pattern">Patrón de búsqueda (comodines <c>*</c> y <c>?</c>).</param>
+        /// <param name="tokenSource"><see cref="CancellationTokenSource"/> compartido para cancelar todas las búsquedas.</param>
+        /// <param name="handlerOption">Define dónde se ejecutan los manejadores de <see cref="FilesFound"/>.</param>
         /// <exception cref="ArgumentException"></exception>
         /// <exception cref="ArgumentNullException"></exception>
         public FileSearchMultiple(List<string> folders, string pattern, CancellationTokenSource tokenSource, ExecuteHandlers handlerOption)
@@ -172,11 +177,11 @@ namespace NETFastSearchLibrary
 
 
         /// <summary>
-        /// Initializes a new instance of FileSearchMultiple class.
+        /// Inicializa búsqueda múltiple con patrón de búsqueda y cancelación.
         /// </summary>
-        /// <param name="folders">Start search directories.</param>
-        /// <param name="pattern">The search pattern.</param>
-        /// <param name="tokenSource">Instance of CancellationTokenSource for search process cancellation possibility.</param>
+        /// <param name="folders">Lista de directorios raíz.</param>
+        /// <param name="pattern">Patrón de búsqueda (comodines <c>*</c> y <c>?</c>).</param>
+        /// <param name="tokenSource"><see cref="CancellationTokenSource"/> compartido para cancelar todas las búsquedas.</param>
         /// <exception cref="ArgumentException"></exception>
         /// <exception cref="ArgumentNullException"></exception>
         public FileSearchMultiple(List<string> folders, string pattern, CancellationTokenSource tokenSource) 
@@ -186,10 +191,10 @@ namespace NETFastSearchLibrary
 
 
         /// <summary>
-        /// Initializes a new instance of FileSearchMultiple class.
+        /// Inicializa búsqueda múltiple en varias carpetas (patrón <c>*</c>) con cancelación.
         /// </summary>
-        /// <param name="folders">Start search directories.</param>
-        /// <param name="tokenSource">Instance of CancellationTokenSource for search process cancellation possibility.</param>
+        /// <param name="folders">Lista de directorios raíz.</param>
+        /// <param name="tokenSource"><see cref="CancellationTokenSource"/> compartido para cancelar todas las búsquedas.</param>
         /// <exception cref="ArgumentException"></exception>
         /// <exception cref="ArgumentNullException"></exception>
         public FileSearchMultiple(List<string> folders, CancellationTokenSource tokenSource) 
@@ -256,7 +261,7 @@ namespace NETFastSearchLibrary
 
 
         /// <summary>
-        /// Starts a file search operation with realtime reporting using several threads in thread pool.
+        /// Inicia la búsqueda en todas las carpetas configuradas.
         /// </summary>
         public void StartSearch()
         {
@@ -280,8 +285,9 @@ namespace NETFastSearchLibrary
 
 
         /// <summary>
-        /// Starts a file search operation with realtime reporting using several threads in thread pool as an asynchronous operation.
+        /// Inicia la búsqueda en todas las carpetas de forma asíncrona.
         /// </summary>
+        /// <returns>Tarea que representa la operación de búsqueda.</returns>
         public Task StartSearchAsync()
         {
              return TaskEx.Run(() =>
@@ -293,7 +299,7 @@ namespace NETFastSearchLibrary
 
 
         /// <summary>
-        /// Stops a file search operation.
+        /// Cancela la búsqueda en curso en todas las carpetas.
         /// </summary>
         public void StopSearch()
         {
