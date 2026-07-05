@@ -4,12 +4,25 @@ Todos los cambios notables de este proyecto se documentan en este archivo.
 
 El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 
-### Fixed
+## [1.0.5] - 2026-07-05
 
-- `NETFastSearchLibrary.Legacy.nuspec`: empaquetado NuGet en Linux (`target=""` provocaba `entryName` vacío); rutas con `/`.
+### Added
 
+- NuGet [Trusted Publishing](https://learn.microsoft.com/en-us/nuget/nuget-org/trusted-publishing) (OIDC) en `release.yml` con `NuGet/login@v1` y environment `nuget-publish`.
+- `docs/CI.md`: guía de workflows, secretos, política en nuget.org y solución de problemas.
 
-- `build-dist.sh`: menú interactivo por defecto; release completo y comandos CLI (`--release`, `--pack`, `--push-nuget`, etc.).
+### Changed
+
+- `release.yml`: environment `release` → `nuget-publish`; push NuGet con credencial efímera (sin `NUGET_API_KEY` permanente).
+- `ci.yml` / `release.yml`: acciones `@v5`/`@v4`, `FORCE_JAVASCRIPT_ACTIONS_TO_NODE24`, reference assemblies net40 en workflow (sin import en `.csproj`, compatible con Mono).
+- Scripts de release: NuGet.org vía CI al empujar tag; eliminado `release.env` y push manual con API key.
+
+### Removed
+
+- `scripts/release.env.example` y soporte de `NUGET_API_KEY` en scripts locales.
+- Opción `--push-nuget` y código legacy de publicación manual en NuGet.
+- `build-dist.sh` / `release.ps1`: flujo recomendado local + tag → CI publica en NuGet.
+- README: documentación Trusted Publishing alineada con [NetcoreFSL](https://github.com/alanjmrt94/netcore-fsl).
 
 ## [1.0.4] - 2026-07-05
 
@@ -30,6 +43,9 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/
 - `FileSearchBase.OnSearchCompleted` maneja `AggregateException` cuando `ExecuteHandlers.InNewTask`.
 - `app.manifest` sin `longPathAware` (compatible con objetivo Windows XP).
 - Comentarios XML en `FileSearch`: `cref` ambiguos en `GetFiles`/`GetFilesFast` y `<summary>` duplicado en constructor.
+- `NETFastSearchLibrary.Legacy.nuspec`: empaquetado NuGet en Linux (`target=""` provocaba `entryName` vacío); rutas con `/`.
+- `build-dist.sh`: menú interactivo por defecto; release completo y comandos CLI (`--release`, `--pack`, etc.).
+- `build-dist.sh`: push NuGet en Linux vía `dotnet nuget push`; omitir tag/GitHub Release si ya existen en remoto.
 
 ### Changed
 
@@ -42,7 +58,6 @@ El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/
 - `NETFastSearchLibrary.csproj`: documentación XML en configuración Release; firma condicional `OfficialBuild`.
 - README: requisito Visual Studio 2015+; compilación local vs oficial; instalación NuGet; guía de secretos GitHub/nuget.org.
 - `.gitignore`: `*.snk`, `*_base64`, `scripts/release.env`, `dist/`.
-- Eliminado `PackageReference` duplicado; restauración NuGet vía `packages.config`.
 
 ### Removed
 

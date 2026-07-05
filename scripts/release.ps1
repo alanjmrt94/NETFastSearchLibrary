@@ -4,23 +4,20 @@
     Compila, firma, empaqueta y publica NETFastSearchLibrary.Legacy.
 
 .DESCRIPTION
-    Flujo local equivalente a .github/workflows/release.yml:
+    Flujo local + CI (Trusted Publishing):
       1. Restore NuGet + MSBuild Release (strong-name)
       2. Salida en dist/<version>/
-      3. nuget pack + Author Signing (Authenticode)
-      4. Push a nuget.org (opcional)
-      5. Tag git + GitHub Release (opcional, requiere gh CLI)
+      3. nuget pack + Author Signing opcional (Authenticode)
+      4. Tag git + GitHub Release (opcional, requiere gh CLI)
+      5. NuGet.org lo publica release.yml al recibir el tag (OIDC)
 
-    Requiere Windows, MSBuild, NuGet CLI 6.x+ y certificado Authenticode registrado en nuget.org.
+    Requiere Windows, MSBuild, NuGet CLI 6.x+.
 
 .PARAMETER Version
-    Versión semver (ej. 1.0.4). Debe coincidir con AssemblyInfo.cs.
+    Versión semver (ej. 1.0.5). Debe coincidir con AssemblyInfo.cs.
 
 .PARAMETER DistOnly
-    Solo compila y genera dist/ (sin firmar nupkg ni publicar).
-
-.PARAMETER SkipNuGetPush
-    No publica en nuget.org.
+    Solo compila y genera dist/ (sin pack, tag ni GitHub Release).
 
 .PARAMETER SkipGitHubRelease
     No crea release en GitHub.
@@ -32,28 +29,23 @@
     Continúa aunque el árbol git no esté limpio.
 
 .EXAMPLE
-    .\scripts\release.ps1 -Version 1.0.4
+    .\scripts\release.ps1 -Version 1.0.5
 
 .EXAMPLE
-    # Solo artefactos locales
-    .\scripts\release.ps1 -Version 1.0.4 -DistOnly
+    .\scripts\release.ps1 -Version 1.0.5 -DistOnly
 
 .PARAMETER ExportSnkBase64
     Exporta el .snk a base64 (una línea) en <archivo>_base64 y termina.
 
 .PARAMETER ExportPfxBase64
     Exporta el .pfx a base64 (una línea) en <archivo>_base64 y termina.
-    Requiere -SignCertPath o NUGET_SIGN_CERT_PFX.
+    Requiere -SignCertPath.
 
 .EXAMPLE
     .\scripts\release.ps1 -ExportSnkBase64
 
 .EXAMPLE
     .\scripts\release.ps1 -ExportPfxBase64 -SignCertPath C:\ruta\codigo-firma.pfx
-
-.EXAMPLE
-    # Cargar secretos desde archivo (no versionado)
-    .\scripts\release.ps1 -Version 1.0.4 -EnvFile .\scripts\release.env
 #>
 [CmdletBinding()]
 param(
@@ -64,16 +56,13 @@ param(
     [switch] $ExportSnkBase64,
     [switch] $ExportPfxBase64,
     [switch] $DistOnly,
-    [switch] $SkipNuGetPush,
     [switch] $SkipGitHubRelease,
     [switch] $SkipGitTag,
     [switch] $Force,
 
-    [string] $EnvFile,
     [string] $SnkPath,
     [string] $SignCertPath,
     [string] $SignCertPassword,
-    [string] $NuGetApiKey,
     [string] $RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 )
 
@@ -82,21 +71,6 @@ $ErrorActionPreference = 'Stop'
 
 function Write-Step([string] $Message) {
     Write-Host "`n==> $Message" -ForegroundColor Cyan
-}
-
-function Import-EnvFile([string] $Path) {
-    if (-not (Test-Path -LiteralPath $Path)) {
-        throw "No se encontró el archivo de entorno: $Path"
-    }
-    Get-Content -LiteralPath $Path | ForEach-Object {
-        $line = $_.Trim()
-        if ($line -eq '' -or $line.StartsWith('#')) { return }
-        if ($line -match '^(?<key>[A-Za-z_][A-Za-z0-9_]*)=(?<value>.*)$') {
-            $key = $Matches['key']
-            $value = $Matches['value'].Trim().Trim('"').Trim("'")
-            Set-Item -Path "Env:$key" -Value $value
-        }
-    }
 }
 
 function Resolve-Tool([string] $Name, [string[]] $Candidates) {
@@ -138,7 +112,7 @@ function Export-FileBase64([string] $FilePath, [string] $SecretName) {
     [IO.File]::WriteAllText($outPath, $encoded, [Text.UTF8Encoding]::new($false))
     Write-Host "    Origen:  $resolved" -ForegroundColor Green
     Write-Host "    Salida:  $outPath" -ForegroundColor Green
-    Write-Host "    Secreto GitHub: $SecretName" -ForegroundColor Yellow
+    Write-Host "    Secreto GitHub (environment nuget-publish): $SecretName" -ForegroundColor Yellow
     return $outPath
 }
 
@@ -148,33 +122,27 @@ function Show-ReleaseHelp {
 Uso: .\scripts\release.ps1 [opciones]
 
 Release
-  -Version <semver>           Build firmado + dist + NuGet + GitHub (Windows)
-  -DistOnly                   Solo compila dist/ (sin NuGet ni GitHub)
-  -EnvFile .\scripts\release.env
+  -Version <semver>           Build firmado + dist + tag + GitHub (NuGet vía CI)
+  -DistOnly                   Solo compila dist/ (sin pack, tag ni GitHub)
 
 Exportación base64 (*_base64, gitignored)
   -ExportSnkBase64            → EMZAPPS_SNK
   -ExportPfxBase64            → NUGET_SIGN_CERT_PFX (requiere -SignCertPath)
 
-Secretos GitHub (environment: release)
+Secretos GitHub (environment: nuget-publish)
+  NUGET_USER                  username nuget.org (Trusted Publishing)
   EMZAPPS_SNK                 .snk en base64
-  NUGET_SIGN_CERT_PFX         .pfx en base64
-  NUGET_SIGN_CERT_PASSWORD    contraseña del .pfx
-  NUGET_API_KEY               API key nuget.org
+  NUGET_SIGN_CERT_PFX         .pfx en base64 (opcional)
+  NUGET_SIGN_CERT_PASSWORD    contraseña del .pfx (opcional)
 
-Linux: ./scripts/build-dist.sh --help
+Ver docs/CI.md. Linux: ./scripts/build-dist.sh --help
 
 "@ | Write-Host
 }
 
 # --- Configuración ---
-if ($EnvFile) {
-    Import-EnvFile -Path (Resolve-Path -LiteralPath $EnvFile).Path
-}
-
 $projectDir = Join-Path $RepoRoot 'NETFastSearchLibrary'
-$SnkPath = if ($SnkPath) { $SnkPath } elseif ($env:EMZAPPS_SNK_PATH) { $env:EMZAPPS_SNK_PATH } else { Join-Path $projectDir 'EMZApps.snk' }
-$SignCertPath = if ($SignCertPath) { $SignCertPath } elseif ($env:NUGET_SIGN_CERT_PFX) { $env:NUGET_SIGN_CERT_PFX } else { $null }
+$SnkPath = if ($SnkPath) { $SnkPath } else { Join-Path $projectDir 'EMZApps.snk' }
 
 if ($ExportSnkBase64 -and $ExportPfxBase64) {
     throw 'Use solo uno: -ExportSnkBase64 o -ExportPfxBase64.'
@@ -192,7 +160,7 @@ if ($ExportSnkBase64) {
 if ($ExportPfxBase64) {
     Write-Step 'Exportando certificado PFX a base64'
     if ([string]::IsNullOrWhiteSpace($SignCertPath) -or -not (Test-Path -LiteralPath $SignCertPath)) {
-        throw 'Indique -SignCertPath o NUGET_SIGN_CERT_PFX con la ruta al .pfx.'
+        throw 'Indique -SignCertPath con la ruta al .pfx.'
     }
     Export-FileBase64 -FilePath $SignCertPath -SecretName 'NUGET_SIGN_CERT_PFX' | Out-Null
     exit 0
@@ -207,9 +175,6 @@ $csproj = Join-Path $projectDir 'NETFastSearchLibrary.csproj'
 $nuspec = Join-Path $projectDir 'NETFastSearchLibrary.Legacy.nuspec'
 $solution = Join-Path $RepoRoot 'NETFastSearchLibrary.sln'
 $assemblyInfo = Join-Path $projectDir 'Properties\AssemblyInfo.cs'
-
-$SignCertPassword = if ($SignCertPassword) { $SignCertPassword } else { $env:NUGET_SIGN_CERT_PASSWORD }
-$NuGetApiKey = if ($NuGetApiKey) { $NuGetApiKey } else { $env:NUGET_API_KEY }
 
 $tag = "v$Version"
 $distDir = Join-Path $RepoRoot "dist\$Version"
@@ -290,7 +255,7 @@ Copy-Item -LiteralPath (Join-Path $RepoRoot 'README.md') -Destination $distDir
 Write-Host "    dist: $distDir" -ForegroundColor Green
 
 if ($DistOnly) {
-    Write-Step 'DistOnly: omitiendo pack, firma NuGet y publicación.'
+    Write-Step 'DistOnly: omitiendo pack, tag y GitHub Release.'
     exit 0
 }
 
@@ -326,21 +291,7 @@ if ($authorSignReady) {
     Write-Host '    Author Signing omitido (sin certificado). nuget.org aplicará Repository Signing.' -ForegroundColor Yellow
 }
 
-# --- NuGet push ---
-if (-not $SkipNuGetPush) {
-    if ([string]::IsNullOrWhiteSpace($NuGetApiKey)) {
-        throw 'Defina NUGET_API_KEY o -NuGetApiKey para publicar en nuget.org.'
-    }
-    Write-Step 'Publicando en nuget.org'
-    Invoke-External -FilePath $nuget -ArgumentList @(
-        'push', $nupkg.FullName,
-        '-Source', 'https://api.nuget.org/v3/index.json',
-        '-ApiKey', $NuGetApiKey,
-        '-SkipDuplicate'
-    )
-} else {
-    Write-Host '    SkipNuGetPush: no se publicó en nuget.org.' -ForegroundColor Yellow
-}
+Write-Host '    NuGet.org: release.yml (Trusted Publishing) al empujar el tag.' -ForegroundColor Yellow
 
 # --- Git tag ---
 if (-not $SkipGitTag) {
@@ -383,8 +334,8 @@ if (-not $SkipGitHubRelease) {
 }
 
 if (-not $SkipGitTag) {
-    Write-Host "`n    Nota: el push del tag también dispara .github/workflows/release.yml." -ForegroundColor Yellow
-    Write-Host '    Use -SkipGitTag -SkipGitHubRelease para publicar solo desde este script sin CI.' -ForegroundColor Yellow
+    Write-Host "`n    CI: release.yml publicará en NuGet vía Trusted Publishing." -ForegroundColor Yellow
+    Write-Host '    Ver: gh run list --workflow=release.yml' -ForegroundColor Yellow
 }
 
 Write-Step 'Release completado'

@@ -5,7 +5,7 @@
 <td width="220" valign="top"><img src="logo_base.png" alt="NETFastSearchLibrary" width="200"/></td>
 <td valign="top">
 
-**Versión:** `1.0.4` · **Estado:** mantenimiento mínimo (solo .NET Framework 4.0)  
+**Versión:** `1.0.5` · **Estado:** mantenimiento mínimo (solo .NET Framework 4.0)  
 **Autor:** [alanjmrt94](https://github.com/alanjmrt94) · **Organización:** EMZ Apps  
 **Repositorio sucesor:** [**NetcoreFSL**](https://github.com/alanjmrt94/netcore-fsl) — biblioteca multiplataforma para .NET 8
 
@@ -262,37 +262,27 @@ Si su proyecto puede usar .NET 8, considere migrar a [NetcoreFSL](https://github
 
 ## Publicación en NuGet (mantenedores)
 
-El workflow `.github/workflows/release.yml` se ejecuta al pushear un tag `v*` (ej. `v1.0.4`):
+Documentación detallada: [`docs/CI.md`](docs/CI.md).
+
+El workflow `.github/workflows/release.yml` se ejecuta al pushear un tag `v*.*.*` (ej. `v1.0.5`):
 
 1. Compila Release con **strong name** (`OfficialBuild=true`)
 2. Empaqueta `NETFastSearchLibrary.Legacy.nuspec`
-3. Publica en **nuget.org** (paquete **sin** Author Signing; nuget.org aplica **Repository Signing**)
+3. Publica en **nuget.org** vía [Trusted Publishing](https://learn.microsoft.com/en-us/nuget/nuget-org/trusted-publishing) (OIDC, sin API key permanente)
 4. Crea GitHub Release con assets
 
-**Author Signing** (certificado Authenticode) es **opcional**: si más adelante agregás `NUGET_SIGN_CERT_PFX` y `NUGET_SIGN_CERT_PASSWORD` en GitHub, el workflow firmará el `.nupkg` automáticamente.
+**Author Signing** (certificado Authenticode) es **opcional**: si agregás `NUGET_SIGN_CERT_PFX` y `NUGET_SIGN_CERT_PASSWORD` en GitHub, el workflow firmará el `.nupkg` automáticamente.
 
-### Qué hacer en nuget.org (sin certificado)
-
-1. **Cuenta:** registrarse en [nuget.org](https://www.nuget.org/) (usuario alanjmrt94 / org EMZ Apps).
-2. **API Key:** [Account → API Keys](https://www.nuget.org/account/apikeys) → **Create**
-   - **Glob pattern:** `NETFastSearchLibrary.Legacy` (recomendado) o `*` para todas
-   - **Expiration:** 1 año (renovar después)
-   - Copiar la clave → secreto GitHub `NUGET_API_KEY`
-3. **Certificates:** **no hace falta** registrar certificado para publicar unsigned.
-4. **Primer push:** el ID `NETFastSearchLibrary.Legacy` queda reservado para tu cuenta al subir la primera versión.
-
-No activar «Require signing by a registered certificate» en el paquete hasta tener certificado Authenticode.
-
-### GitHub — environment `release`
+### GitHub — environment `nuget-publish`
 
 | Secreto | Obligatorio | Descripción |
 |---------|-------------|-------------|
+| `NUGET_USER` | Sí | Username nuget.org de quien **creó** la política Trusted Publishing |
 | `EMZAPPS_SNK` | Sí | `EMZApps.snk` en **base64** |
-| `NUGET_API_KEY` | Sí | API key de nuget.org |
 | `NUGET_SIGN_CERT_PFX` | No | `.pfx` Authenticode en base64 (futuro Author Signing) |
 | `NUGET_SIGN_CERT_PASSWORD` | No | Contraseña del `.pfx` |
 
-Crear environment: repo → **Settings** → **Environments** → **New environment** → `release`.
+Crear environment: repo → **Settings** → **Environments** → **New environment** → `nuget-publish`.
 
 Exportar `EMZAPPS_SNK`:
 
@@ -300,43 +290,57 @@ Exportar `EMZAPPS_SNK`:
 ./scripts/build-dist.sh --export-snk-base64
 ```
 
+### nuget.org — Trusted Publishing
+
+**nuget.org** → cuenta → **Trusted Publishing** → política con:
+
+| Campo | Valor |
+|-------|--------|
+| Package owner | `alanjmrt94` |
+| Repository Owner | `alanjmrt94` |
+| Repository | `NETFastSearchLibrary` |
+| Workflow File | `release.yml` |
+| Environment | `nuget-publish` |
+
+No hace falta API Key ni certificado registrado para publicar (Repository Signing automático en nuget.org).
+
 ### Publicar una versión
 
-**Opción A — GitHub Actions (recomendado):** configurar secretos en el environment `release`, actualizar versión, luego:
+**Opción A — GitHub Actions (recomendado):** actualizar versión en `AssemblyInfo.cs`, commitear, luego:
 
 ```bash
-git tag v1.0.5 && git push origin v1.0.5
+git tag -a v1.0.5 -m "Release v1.0.5"
+git push origin v1.0.5
 ```
 
-**Opción B — Script local (Windows):**
+**Opción B — Script local + CI:** compila/empaqueta localmente, crea tag y GitHub Release; NuGet lo publica CI al recibir el tag.
+
+Windows:
 
 ```powershell
-copy scripts\release.env.example scripts\release.env   # completar valores
-.\scripts\release.ps1 -Version 1.0.5 -EnvFile .\scripts\release.env `
-  -SkipGitTag -SkipGitHubRelease   # evita doble publicación si CI también está activo
+.\scripts\release.ps1 -Version 1.0.5
 ```
 
-Solo artefactos en `dist/` (sin NuGet ni GitHub):
+Linux:
+
+```bash
+./scripts/build-dist.sh --release 1.0.5
+```
+
+Solo artefactos en `dist/` (sin tag ni NuGet):
 
 ```powershell
 .\scripts\release.ps1 -Version 1.0.5 -DistOnly
 ```
 
-En Linux (menú interactivo por defecto):
-
-```bash
-chmod +x scripts/build-dist.sh
-./scripts/build-dist.sh              # menú
-./scripts/build-dist.sh --release 1.0.4   # release completo sin menú
-```
-
-Salida: `dist/<version>/` con DLL, XML, `.nupkg` (Windows completo) y metadatos.
+Salida: `dist/<version>/` con DLL, XML, `.nupkg` y metadatos.
 
 ## Estructura del repositorio
 
 ```
 NETFastSearchLibrary/
-├── .github/workflows/        # CI (unsigned) y Release (firmado + NuGet)
+├── .github/workflows/        # CI (unsigned) y Release (firmado + NuGet OIDC)
+├── docs/CI.md                # GitHub Actions, Trusted Publishing, troubleshooting
 ├── scripts/                  # release.ps1 (Windows), build-dist.sh (Linux)
 ├── NETFastSearchLibrary/     # Biblioteca (.NET Framework 4.0)
 │   ├── fsl.ico               # Icono del ensamblado
@@ -352,8 +356,8 @@ NETFastSearchLibrary/
 
 La versión se define en `NETFastSearchLibrary/Properties/AssemblyInfo.cs`:
 
-- `AssemblyVersion`: `1.0.4.0`
-- `AssemblyInformationalVersion`: `1.0.4 (.NET Framework 4.0, Legacy)`
+- `AssemblyVersion`: `1.0.5.0`
+- `AssemblyInformationalVersion`: `1.0.5 (.NET Framework 4.0, Legacy)`
 
 ## Licencia
 

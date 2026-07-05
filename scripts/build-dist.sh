@@ -14,29 +14,12 @@ BUILD_XBUILD_FALLBACK=false
 BUILD_HINT_SHOWN=false
 
 DEFAULT_SNK="$ROOT/NETFastSearchLibrary/EMZApps.snk"
-ENV_FILE="$SCRIPT_DIR/release.env"
+EMZAPPS_SNK_PATH="${EMZAPPS_SNK_PATH:-$DEFAULT_SNK}"
 PROJECT="$ROOT/NETFastSearchLibrary/NETFastSearchLibrary.csproj"
-NUSPEC="$ROOT/NETFastSearchLibrary/NETFastSearchLibrary.Legacy.nuspec"
-SOLUTION="$ROOT/NETFastSearchLibrary.sln"
 ASSEMBLY_INFO="$ROOT/NETFastSearchLibrary/Properties/AssemblyInfo.cs"
 GITHUB_REPO="${GITHUB_REPO:-alanjmrt94/NETFastSearchLibrary}"
 
 # --- Utilidades ---
-
-load_env() {
-  EMZAPPS_SNK_PATH="${EMZAPPS_SNK_PATH:-$DEFAULT_SNK}"
-  if [[ -f "$ENV_FILE" ]]; then
-    while IFS= read -r line || [[ -n "$line" ]]; do
-      line="${line//$'\r'/}"
-      [[ "$line" =~ ^[[:space:]]*# ]] && continue
-      [[ "$line" =~ ^[[:space:]]*$ ]] && continue
-      if [[ "$line" =~ ^([A-Za-z_][A-Za-z0-9_]*)=(.*)$ ]]; then
-        export "${BASH_REMATCH[1]}=${BASH_REMATCH[2]}"
-      fi
-    done < "$ENV_FILE"
-    EMZAPPS_SNK_PATH="${EMZAPPS_SNK_PATH:-$DEFAULT_SNK}"
-  fi
-}
 
 get_assembly_version() {
   grep -oP 'AssemblyVersion\("\K[0-9]+\.[0-9]+\.[0-9]+' "$ASSEMBLY_INFO" 2>/dev/null || true
@@ -75,7 +58,7 @@ check_git_clean() {
 }
 
 snk_available() {
-  [[ -f "${EMZAPPS_SNK_PATH:-$DEFAULT_SNK}" ]]
+  [[ -f "$EMZAPPS_SNK_PATH" ]]
 }
 
 export_base64() {
@@ -86,7 +69,7 @@ export_base64() {
   base64 -w0 "$src" > "$out"
   echo "==> Exportado: $out"
   echo "    Secreto GitHub: $secret_name"
-  echo "    Copie el contenido (una sola línea) en Environment → release → Secrets."
+  echo "    Copie el contenido (una sola línea) en Environment → nuget-publish → Secrets."
 }
 
 restore_packages() {
@@ -234,33 +217,6 @@ pack_nuget() {
   ls -la "$nupkg"
 }
 
-push_nuget() {
-  local version="$1"
-  load_env
-  local dist="$ROOT/dist/$version"
-  local nupkg
-  nupkg="$(find "$dist" -maxdepth 1 -name '*.nupkg' -print -quit 2>/dev/null || true)"
-  [[ -n "$nupkg" ]] || { echo "No hay .nupkg en $dist — empaquete primero." >&2; return 1; }
-  [[ -n "${NUGET_API_KEY:-}" ]] || {
-    echo "Defina NUGET_API_KEY en $ENV_FILE o en el entorno." >&2
-    return 1
-  }
-
-  echo "==> Publicando en nuget.org"
-  # dotnet CLI usa OpenSSL del sistema; nuget.exe (Mono) falla con CERTIFICATE_VERIFY_FAILED en Linux.
-  if command -v dotnet >/dev/null 2>&1; then
-    dotnet nuget push "$nupkg" \
-      --source https://api.nuget.org/v3/index.json \
-      --api-key "$NUGET_API_KEY" \
-      --skip-duplicate
-    return $?
-  fi
-
-  command -v nuget >/dev/null || { echo "Se requiere dotnet CLI o nuget.exe." >&2; return 1; }
-  nuget push "$nupkg" -Source https://api.nuget.org/v3/index.json \
-    -ApiKey "$NUGET_API_KEY" -SkipDuplicate
-}
-
 tag_exists_remote() {
   local tag="$1"
   git -C "$ROOT" ls-remote --tags origin "refs/tags/${tag}" 2>/dev/null | grep -q .
@@ -293,7 +249,8 @@ push_git_tag() {
   git -C "$ROOT" rev-parse "$tag" >/dev/null 2>&1 || create_git_tag "$version" || return 1
   echo "==> Empujando tag $tag a origin"
   if git -C "$ROOT" push origin "$tag"; then
-    echo "    Si release.yml está activo, CI publicará en NuGet y creará GitHub Release."
+    echo "    CI (release.yml) publicará en NuGet vía Trusted Publishing."
+    echo "    Ver: gh run list --workflow=release.yml"
   else
     echo "    Push del tag falló (puede existir ya en remoto)." >&2
     return 1
@@ -333,11 +290,11 @@ do_full_release() {
   local version="$1"
   local push_tag="${2:-ask}"
 
-  load_env
   validate_version "$version" || return 1
 
   echo ""
-  echo "=== Release completo v$version ==="
+  echo "=== Release v$version (local + CI) ==="
+  echo "  Pipeline: compilar → pack → GitHub Release → push tag → NuGet (Trusted Publishing)"
   check_git_clean || confirm "¿Continuar de todos modos?" || return 1
 
   local official="false"
@@ -352,12 +309,6 @@ do_full_release() {
   copy_dist_assets "$version" >/dev/null
   pack_nuget "$version" || return 1
 
-  if [[ -n "${NUGET_API_KEY:-}" ]]; then
-    push_nuget "$version" || return 1
-  else
-    echo "    NuGet push omitido (sin NUGET_API_KEY en release.env)." >&2
-  fi
-
   if command -v gh >/dev/null; then
     github_release "$version" || echo "    GitHub Release falló o ya existe." >&2
   else
@@ -369,8 +320,10 @@ do_full_release() {
   case "$push_tag" in
     yes) push_git_tag "$version" ;;
     ask)
-      if confirm "¿Empujar tag $tag a origin (dispara CI)?"; then
+      if confirm "¿Empujar tag $tag a origin (CI publica en NuGet)?"; then
         push_git_tag "$version"
+      else
+        echo "    Sin tag: NuGet.org no se publicará (Trusted Publishing requiere push del tag)." >&2
       fi
       ;;
   esac
@@ -378,6 +331,7 @@ do_full_release() {
   echo ""
   echo "==> Release v$version finalizado."
   echo "    Dist: $ROOT/dist/$version"
+  echo "    NuGet: gh run list --workflow=release.yml"
 }
 
 prompt_version() {
@@ -396,10 +350,9 @@ Sin argumentos: menú interactivo.
 
 Comandos CLI
   <version>                   Compilar dist/<version>/ (unsigned)
-  --release <version>         Release completo (compilar + pack + NuGet + tag + GH)
+  --release <version>         Release: compilar + pack + GH Release + tag (NuGet vía CI)
   --build <version>           Solo compilar dist/
   --pack <version>            Empaquetar .nupkg (requiere DLL compilado)
-  --push-nuget <version>      Publicar .nupkg en nuget.org
   --tag <version>             Crear tag git v<version>
   --push-tag <version>        git push origin v<version> (dispara CI)
   --github-release <version>  GitHub Release con assets de dist/
@@ -409,21 +362,19 @@ Comandos CLI
   --menu                      Menú interactivo
   -h, --help                  Esta ayuda
 
-Configuración local: $ENV_FILE (ver release.env.example)
-Strong-name: $DEFAULT_SNK
+Strong-name: $DEFAULT_SNK (override: EMZAPPS_SNK_PATH)
 Repo GitHub: $GITHUB_REPO
 
 Notas
   - Compilación: msbuild (preferido) o xbuild. En Ubuntu instale mono-complete del repo oficial Mono.
-  - En Linux: nuget pack/push con nuget.exe (Mono) falla SSL; pack usa rutas del nuspec, push usa dotnet nuget push.
+  - NuGet.org: Trusted Publishing en release.yml (environment nuget-publish). Ver docs/CI.md.
   - nuget sign (Author Signing) requiere Windows; aquí se publica unsigned (Repository Signing).
-  - Si empuja el tag, CI puede duplicar NuGet/GitHub Release — use una vía u otra.
+  - Empujar el tag dispara CI; evite publicar NuGet manualmente si CI está activo.
 
 EOF
 }
 
 show_menu() {
-  load_env
   local version
   version="$(get_assembly_version)"
   [[ -n "$version" ]] || version="?.?.?"
@@ -434,33 +385,31 @@ show_menu() {
     echo "║  NETFastSearchLibrary Legacy — Release                   ║"
     echo "╚══════════════════════════════════════════════════════════╝"
     echo "  Versión en AssemblyInfo: $version"
-    echo "  release.env: $([[ -f $ENV_FILE ]] && echo sí || echo no)"
     echo "  EMZApps.snk: $(snk_available && echo sí || echo no)"
-    echo "  NUGET_API_KEY: $([[ -n ${NUGET_API_KEY:-} ]] && echo configurada || echo no)"
+    echo "  NuGet.org: Trusted Publishing (CI, environment nuget-publish)"
     echo ""
     echo "  ── Publicación ──"
-    echo "  1) Release completo (compilar + NuGet + tag + GitHub Release)"
-    echo "  2) Release vía CI (solo tag + push → GitHub Actions publica)"
+    echo "  1) Release (compilar + pack + GH Release + tag → CI publica NuGet)"
+    echo "  2) Solo tag + push (dispara CI sin build local)"
     echo ""
     echo "  ── Pasos individuales ──"
     echo "  3) Compilar dist/ (local)"
     echo "  4) Empaquetar NuGet (.nupkg)"
-    echo "  5) Publicar en nuget.org"
-    echo "  6) Crear tag git (v$version)"
-    echo "  7) GitHub Release (assets en dist/)"
-    echo "  8) Empujar tag a origin (dispara CI)"
+    echo "  5) Crear tag git (v$version)"
+    echo "  6) GitHub Release (assets en dist/)"
+    echo "  7) Empujar tag a origin (dispara CI)"
     echo ""
     echo "  ── Secretos / utilidades ──"
-    echo "  9) Exportar EMZApps.snk → base64"
-    echo " 10) Exportar .pfx → base64"
-    echo " 11) Ayuda"
-    echo " 12) Restaurar paquetes NuGet (curl → packages/)"
+    echo "  8) Exportar EMZApps.snk → base64"
+    echo "  9) Exportar .pfx → base64"
+    echo " 10) Ayuda"
+    echo " 11) Restaurar paquetes NuGet (curl → packages/)"
     echo "  0) Salir"
     echo ""
     read -r -p "Opción: " choice
 
     local picked_version="$version"
-    if [[ "$choice" =~ ^[1-8]$ ]]; then
+    if [[ "$choice" =~ ^[1-7]$ ]]; then
       picked_version="$(prompt_version)"
       validate_version "$picked_version" || continue
       version="$(get_assembly_version)"
@@ -481,28 +430,25 @@ show_menu() {
         pack_nuget "$picked_version"
         ;;
       5)
-        push_nuget "$picked_version"
-        ;;
-      6)
         create_git_tag "$picked_version"
         ;;
-      7)
+      6)
         github_release "$picked_version"
         ;;
-      8)
+      7)
         push_git_tag "$picked_version"
         ;;
-      9)
-        export_base64 "${EMZAPPS_SNK_PATH:-$DEFAULT_SNK}" "EMZAPPS_SNK"
+      8)
+        export_base64 "$EMZAPPS_SNK_PATH" "EMZAPPS_SNK"
         ;;
-      10)
+      9)
         read -r -p "Ruta al .pfx: " pfx_path
         [[ -n "$pfx_path" ]] && export_base64 "$pfx_path" "NUGET_SIGN_CERT_PFX"
         ;;
-      11)
+      10)
         show_help
         ;;
-      12)
+      11)
         bash "$SCRIPT_DIR/restore-packages.sh" --force
         ;;
       0|q|Q)
@@ -517,7 +463,6 @@ show_menu() {
 }
 
 # --- Entrada ---
-load_env
 
 case "${1:-}" in
   ''|--menu)
@@ -550,10 +495,6 @@ case "${1:-}" in
   --pack)
     [[ -n "${2:-}" ]] || { echo "Uso: $SCRIPT_NAME --pack <version>" >&2; exit 1; }
     pack_nuget "$2"
-    ;;
-  --push-nuget)
-    [[ -n "${2:-}" ]] || { echo "Uso: $SCRIPT_NAME --push-nuget <version>" >&2; exit 1; }
-    push_nuget "$2"
     ;;
   --tag)
     [[ -n "${2:-}" ]] || { echo "Uso: $SCRIPT_NAME --tag <version>" >&2; exit 1; }

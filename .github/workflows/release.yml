@@ -1,11 +1,22 @@
-# Release oficial: strong-name + push a nuget.org (Author Signing opcional si hay certificado)
-# Disparador: tag semver v* (ej. v1.0.4)
+# Release oficial: strong-name + NuGet.org vía Trusted Publishing (OIDC)
+# Disparador: tag semver v*.*.* (ej. v1.0.5)
+#
+# Environment "nuget-publish" (Settings → Environments):
+#   NUGET_USER              — username nuget.org de quien CREÓ la política Trusted Publishing
+#   EMZAPPS_SNK             — strong-name .snk en base64
+#   NUGET_SIGN_CERT_PFX     — (opcional) certificado Authenticode .pfx en base64
+#   NUGET_SIGN_CERT_PASSWORD — (opcional) contraseña del .pfx
+#
+# Sin certificado: el .nupkg se publica sin Author Signing; nuget.org aplica Repository Signing.
 name: Release
 
 on:
   push:
     tags:
-      - v*
+      - 'v*.*.*'
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 permissions:
   contents: write
@@ -14,11 +25,15 @@ jobs:
   release:
     name: Build, sign and publish
     runs-on: windows-latest
-    environment: release
+    environment: nuget-publish
+
+    permissions:
+      contents: write
+      id-token: write
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Extract version from tag
         id: version
@@ -31,9 +46,14 @@ jobs:
           "version=$($Matches['ver'])" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
 
       - name: Setup NuGet
-        uses: nuget/setup-nuget@v2
+        uses: nuget/setup-nuget@v4
         with:
           nuget-version: 6.x
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 8.0.x
 
       - name: Setup MSBuild
         uses: microsoft/setup-msbuild@v2
@@ -114,18 +134,18 @@ jobs:
           $nupkg = Get-ChildItem artifacts\*.nupkg | Select-Object -First 1
           nuget verify -Signatures $nupkg.FullName
 
+      - name: NuGet login (Trusted Publishing)
+        uses: NuGet/login@v1
+        id: nuget_login
+        with:
+          user: ${{ secrets.NUGET_USER }}
+
       - name: Push to NuGet.org
-        shell: pwsh
-        env:
-          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
         run: |
-          if ([string]::IsNullOrWhiteSpace($env:NUGET_API_KEY)) {
-            throw 'Falta el secreto NUGET_API_KEY.'
-          }
-          nuget push artifacts\*.nupkg `
-            -Source https://api.nuget.org/v3/index.json `
-            -ApiKey $env:NUGET_API_KEY `
-            -SkipDuplicate
+          dotnet nuget push ./artifacts/*.nupkg `
+            --api-key "${{ steps.nuget_login.outputs.NUGET_API_KEY }}" `
+            --source https://api.nuget.org/v3/index.json `
+            --skip-duplicate
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2

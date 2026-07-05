@@ -17,8 +17,8 @@ using System.Runtime.InteropServices;
 
 [assembly: ComVisible(false)]
 
-[assembly: AssemblyVersion("1.0.4.0")]
-[assembly: AssemblyFileVersion("1.0.4.0")]
-[assembly: AssemblyInformationalVersion("1.0.4 (.NET Framework 4.0, Legacy)")]
+[assembly: AssemblyVersion("1.0.5.0")]
+[assembly: AssemblyFileVersion("1.0.5.0")]
+[assembly: AssemblyInformationalVersion("1.0.5 (.NET Framework 4.0, Legacy)")]
 [assembly: Guid("61013ada-ae8c-4b71-8cdb-cd7543b22b81")]
 [assembly: NeutralResourcesLanguage("es")]
