@@ -4,7 +4,12 @@ Todos los cambios notables de este proyecto se documentan en este archivo.
 
 El formato se basa en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 
-## [Unreleased]
+### Fixed
+
+- `NETFastSearchLibrary.Legacy.nuspec`: empaquetado NuGet en Linux (`target=""` provocaba `entryName` vacío); rutas con `/`.
+
+
+- `build-dist.sh`: menú interactivo por defecto; release completo y comandos CLI (`--release`, `--pack`, `--push-nuget`, etc.).
 
 ## [1.0.4] - 2026-07-05
 

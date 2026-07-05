@@ -322,12 +322,12 @@ Solo artefactos en `dist/` (sin NuGet ni GitHub):
 .\scripts\release.ps1 -Version 1.0.5 -DistOnly
 ```
 
-En Linux:
+En Linux (menú interactivo por defecto):
 
 ```bash
 chmod +x scripts/build-dist.sh
-./scripts/build-dist.sh --help
-./scripts/build-dist.sh 1.0.4
+./scripts/build-dist.sh              # menú
+./scripts/build-dist.sh --release 1.0.4   # release completo sin menú
 ```
 
 Salida: `dist/<version>/` con DLL, XML, `.nupkg` (Windows completo) y metadatos.

@@ -24,10 +24,11 @@
 		</dependencies>
 	</metadata>
 	<files>
-		<file src="..\logo_base.png" target=""/>
-		<file src="..\README.md" target=""/>
-		<file src="..\LICENSE" target=""/>
-		<file src="bin\Release\NETFastSearchLibrary.dll" target="lib\net40"/>
-		<file src="bin\Release\NETFastSearchLibrary.XML" target="lib\net40"/>
+		<!-- target omitido en raíz: target="" falla en nuget pack Linux (NU entryName vacío) -->
+		<file src="../logo_base.png"/>
+		<file src="../README.md"/>
+		<file src="../LICENSE"/>
+		<file src="bin/Release/NETFastSearchLibrary.dll" target="lib/net40"/>
+		<file src="bin/Release/NETFastSearchLibrary.XML" target="lib/net40"/>
 	</files>
 </package>
