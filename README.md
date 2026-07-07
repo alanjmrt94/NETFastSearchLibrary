@@ -1,5 +1,10 @@
 # NETFastSearchLibrary (Legacy)
 
+[![NuGet](https://img.shields.io/nuget/v/NETFastSearchLibrary.Legacy?label=NuGet)](https://www.nuget.org/packages/NETFastSearchLibrary.Legacy)
+[![CI](https://github.com/alanjmrt94/NETFastSearchLibrary/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/alanjmrt94/NETFastSearchLibrary/actions/workflows/ci.yml)
+[![GitHub release](https://img.shields.io/github/v/release/alanjmrt94/NETFastSearchLibrary?include_prereleases&label=Release)](https://github.com/alanjmrt94/NETFastSearchLibrary/releases)
+[![GitHub](https://img.shields.io/badge/GitHub-Repository-181717?logo=github)](https://github.com/alanjmrt94/NETFastSearchLibrary)
+
 <table>
 <tr>
 <td width="220" valign="top"><img src="logo_base.png" alt="NETFastSearchLibrary" width="200"/></td>
